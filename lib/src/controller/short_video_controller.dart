@@ -81,7 +81,6 @@ class ShortVideoController extends GetxController {
       await _loadUserId();
     }
 
-    // Check all required user data
     if (userId == null || userName == null || userName!.isEmpty || userId!.isEmpty) {
       Get.snackbar(
         "Error",

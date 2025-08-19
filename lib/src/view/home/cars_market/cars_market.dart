@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
 import 'package:olx_prototype/src/utils/app_routes.dart';
-import 'package:olx_prototype/src/view/home/description/description_screen.dart';
 
 class CarsMarket extends StatelessWidget {
   const CarsMarket({super.key});
@@ -12,7 +11,7 @@ class CarsMarket extends StatelessWidget {
   Widget build(BuildContext context) {
     final List<Map<String, String>> carList = [
       {
-        'image': 'assets/images/Suzuki.jpeg',
+        'image': 'assets/images/thaar.jpg',
         'price': '₹ 276,000',
         'title': 'Maruti Suzuki',
         "place" : "Jamshedpur,UP"
@@ -79,7 +78,7 @@ class CarsMarket extends StatelessWidget {
           itemCount: carList.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 1,
-            childAspectRatio: 1.2,
+            childAspectRatio: 1.3,
             crossAxisSpacing: 5,
             mainAxisSpacing: 14,
           ),

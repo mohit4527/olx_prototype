@@ -47,7 +47,7 @@ class SettingScreen extends StatelessWidget {
           ListTile(
             leading: Icon(Icons.notifications,color: AppColors.appGrey.shade800,),
             title: Text("Notifications"),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16),
+            trailing: Icon(Icons.arrow_forward_ios, size: 16,color: AppColors.appGrey.shade600,),
             onTap: () {
               Get.toNamed(AppRoutes.notifications,);
             },
@@ -55,13 +55,13 @@ class SettingScreen extends StatelessWidget {
           ListTile(
             leading: Icon(Icons.remove_red_eye,color: AppColors.appGrey.shade800,),
             title: Text("Appearance"),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16),
+            trailing: Icon(Icons.arrow_forward_ios, size: 16,color: AppColors.appGrey.shade600,),
             onTap: () {},
           ),
           ListTile(
             leading: Icon(Icons.lock,color: AppColors.appGrey.shade800,),
             title: Text("Privacy & Security"),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16),
+            trailing: Icon(Icons.arrow_forward_ios, size: 16,color: AppColors.appGrey.shade600,),
             onTap: () {
               Get.toNamed(AppRoutes.privacy_screen);
             },
@@ -69,7 +69,7 @@ class SettingScreen extends StatelessWidget {
           ListTile(
             leading: Icon(Icons.support_agent,color: AppColors.appGrey.shade800,),
             title: Text("Help and Support"),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16),
+            trailing: Icon(Icons.arrow_forward_ios, size: 16,color: AppColors.appGrey.shade600,),
             onTap: () {
               Get.toNamed(AppRoutes.help_support);
             },
@@ -77,7 +77,7 @@ class SettingScreen extends StatelessWidget {
           ListTile(
             leading: Icon(Icons.info_outline,color: AppColors.appGrey.shade800,),
             title: Text("About"),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16),
+            trailing: Icon(Icons.arrow_forward_ios, size: 16,color: AppColors.appGrey.shade600,),
             onTap: () {
               Get.toNamed(AppRoutes.about);
             },

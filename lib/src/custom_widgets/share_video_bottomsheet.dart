@@ -1,73 +1,126 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
-import 'package:share_plus/share_plus.dart';
-import '../controller/share_video_Controller.dart';
-import '../model/share_video_model/share_video_model.dart';
 
 class ShareBottomSheet extends StatelessWidget {
   final String videoId;
-  final String userId;
 
-  ShareBottomSheet({super.key, required this.videoId, required this.userId});
-
-  final videoController = Get.put(ShareVideoController());
-
-  /// API call + Share
-  Future<void> handleShare(BuildContext context, String platformName) async {
-    try {
-      ShareVideoResponse response = await videoController.shareVideo(videoId, userId);
-
-      if (response.videoUrl.isNotEmpty) {
-        String link = response.videoUrl;
-
-        if (platformName == "whatsapp") {
-          link = "https://wa.me/?text=$link";
-        } else if (platformName == "facebook") {
-          link = "https://www.facebook.com/sharer/sharer.php?u=$link";
-        } else if (platformName == "instagram") {
-          link = link;
-        }
-
-        await Share.share(
-          link,
-          sharePositionOrigin: const Rect.fromLTWH(0, 0, 100, 100),
-        );
-      } else {
-        Get.snackbar("Error", "Video link nahi mila",backgroundColor: AppColors.appBlue,);
-      }
-
-      Get.back();
-    } catch (e) {
-      Get.snackbar("Error", "Kuch gadbad ho gayi",backgroundColor: AppColors.appRed);
-    }
-  }
+  const ShareBottomSheet({
+    super.key,
+    required this.videoId,
+  });
 
   @override
   Widget build(BuildContext context) {
+    // Dummy user list (abhi ke liye hardcoded, API ke baad dynamic karenge)
+    final dummyUsers = [
+      {"name": "Rohit Sharma", "avatar": "https://i.pravatar.cc/150?img=1"},
+      {"name": "Virat Kohli", "avatar": "https://i.pravatar.cc/150?img=2"},
+      {"name": "Hardik Pandya", "avatar": "https://i.pravatar.cc/150?img=3"},
+      {"name": "KL Rahul", "avatar": "https://i.pravatar.cc/150?img=4"},
+      {"name": "Surya Kumar", "avatar": "https://i.pravatar.cc/150?img=5"},
+    ];
+
     return Container(
       padding: const EdgeInsets.all(16),
+      height: MediaQuery.of(context).size.height * 0.65,
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: Wrap(
+      child: Column(
         children: [
-          ListTile(
-            leading: const Icon(Icons.facebook, color: Colors.blue),
-            title: const Text("Share on Facebook"),
-            onTap: () => handleShare(context, "facebook"),
+          /// Drag Handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[400],
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
-          ListTile(
-            leading: const Icon(Icons.camera_alt, color: Colors.purple),
-            title: const Text("Share on Instagram"),
-            onTap: () => handleShare(context, "instagram"),
+          const SizedBox(height: 12),
+
+          /// Title
+          const Text(
+            "Share",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          ListTile(
-            leading: const Icon(FontAwesomeIcons.whatsapp, color: Colors.green),
-            title: const Text("Share on WhatsApp"),
-            onTap: () => handleShare(context, "whatsapp"),
+          const SizedBox(height: 16),
+
+          /// Search Bar
+          TextField(
+            decoration: InputDecoration(
+              hintText: "Search",
+              prefixIcon: const Icon(Icons.search),
+              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          /// User List
+          Expanded(
+            child: ListView.builder(
+              itemCount: dummyUsers.length,
+              itemBuilder: (context, index) {
+                final user = dummyUsers[index];
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage: NetworkImage(user["avatar"]!),
+                    radius: 24,
+                  ),
+                  title: Text(user["name"]!),
+                  trailing: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.appBlue,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    onPressed: () {
+                      Get.snackbar("Shared", "Video shared with ${user["name"]}");
+                    },
+                    child: const Text("Send"),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          /// Bottom Quick Share Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              IconButton(
+                icon: const Icon(FontAwesomeIcons.whatsapp, color: Colors.green),
+                onPressed: () {
+                  Get.snackbar("WhatsApp", "Shared on WhatsApp");
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.facebook, color: Colors.blue),
+                onPressed: () {
+                  Get.snackbar("Facebook", "Shared on Facebook");
+                },
+              ),
+              IconButton(
+                icon: const Icon(FontAwesomeIcons.instagram, color: Colors.purple),
+                onPressed: () {
+                  Get.snackbar("Instagram", "Shared on Instagram");
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.link, color: Colors.grey),
+                onPressed: () {
+                  Get.snackbar("Link", "Copy link");
+                },
+              ),
+            ],
           ),
         ],
       ),

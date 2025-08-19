@@ -1,7 +1,5 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
-
 import '../constants/app_sizer.dart';
 
 class ProductCard extends StatelessWidget {
@@ -24,10 +22,12 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    double cardWidth = MediaQuery.of(context).size.width * 0.55;
+
     return Card(
-      elevation: 1,
+      elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(3),
+        borderRadius: BorderRadius.circular(5),
       ),
       clipBehavior: Clip.antiAlias,
       margin: EdgeInsets.zero,
@@ -36,62 +36,68 @@ class ProductCard extends StatelessWidget {
         children: [
           // Image Section
           AspectRatio(
-            aspectRatio: 0.9,
-            child: Image.network(
+            aspectRatio: 1,
+            child: (imagePath != null && imagePath.trim().isNotEmpty)
+                ? (imagePath.startsWith("http")
+                ? Image.network(
               imagePath,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: Colors.grey.shade300,
-                  child: const Icon(Icons.image, size: 40, color: Colors.grey),
+                return Image.asset(
+                  "assets/images/placeholder.jpg",
+                  fit: BoxFit.cover,
                 );
               },
+            )
+                : Image.asset(
+              imagePath,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Image.asset(
+                  "assets/images/placeholder.jpg",
+                  fit: BoxFit.cover,
+                );
+              },
+            ))
+                : Image.asset(
+              "assets/images/placeholder.jpg",
+              fit: BoxFit.cover,
             ),
           ),
 
+
           // Details Section
+          SizedBox(height: AppSizer().height1,),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Price
                 Text(
                   price,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: AppSizer().fontSize18,
-                    color: Colors.black,
+                    fontSize: AppSizer().fontSize16,
                   ),
                 ),
-                // Title
-                // Text(
-                //   roomInfo,
-                //   maxLines: 1,
-                //   overflow: TextOverflow.ellipsis,
-                //   style: TextStyle(
-                //     fontSize: AppSizer().fontSize14,
-                //     fontWeight: FontWeight.w500,
-                //     color: Colors.grey[800],
-                //   ),
-                // ),
-                //
-                // // Location
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      location,
-                      style: TextStyle(
-                        fontSize: AppSizer().fontSize14,
-                        color: AppColors.appGrey.shade700,
+                    Flexible(
+                      child: Text(
+                        location,
+                        style: TextStyle(
+                          fontSize: AppSizer().fontSize14,
+                          color: AppColors.appGrey,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Text(
                       date,
                       style: TextStyle(
                         fontSize: AppSizer().fontSize14,
-                        color: AppColors.appGrey.shade700,
+                        color: AppColors.appGrey,
                       ),
                     ),
                   ],

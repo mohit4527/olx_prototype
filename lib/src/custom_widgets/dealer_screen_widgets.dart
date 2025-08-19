@@ -96,7 +96,7 @@ class AppCustomWidgets {
     );
   }
 
-  /// -------- Image Upload Box -------
+  /// -------- Image Upload Box --------
   static Widget buildImageUploadBox() {
     return Container(
       height: AppSizer().height8,

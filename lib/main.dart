@@ -8,7 +8,8 @@ import 'package:responsive_sizer/responsive_sizer.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  Get.put(TokenController());
+  Get.put(TokenController(), permanent: true);
+
   runApp(MyApp());
 }
 

@@ -3,6 +3,9 @@ import 'package:get/get.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
+import 'package:olx_prototype/src/utils/app_routes.dart';
+
+import '../../../../custom_widgets/setting_screen_helper.dart';
 
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
@@ -63,7 +66,15 @@ class HelpSupportScreen extends StatelessWidget {
               title: "Report a Problem",
               subtitle: "Tell us if something isn't working.",
               onTap: () {
-                // Navigate to report screen
+                FeedbackDialog.showReportDialog(context);
+              },
+            ),
+            _helpTile(
+              icon: Icons.star_border_outlined,
+              title: "Rate this App",
+              subtitle: "Share Your experience on this app",
+              onTap: () {
+                FeedbackDialog.showRatingDialog(context);
               },
             ),
             _helpTile(
@@ -71,7 +82,7 @@ class HelpSupportScreen extends StatelessWidget {
               title: "Give Feedback",
               subtitle: "Share your thoughts to improve the app.",
               onTap: () {
-                // Navigate to feedback screen
+                FeedbackDialog.showFeedbackDialog(context);
               },
             ),
             _helpTile(
@@ -79,8 +90,8 @@ class HelpSupportScreen extends StatelessWidget {
               title: "Privacy Policy",
               subtitle: "Read how we handle your data.",
               onTap: () {
-                // Open webview or browser
-              },
+                Get.toNamed(AppRoutes.privacy_screen);
+                },
             ),
           ],
         ),
@@ -98,22 +109,22 @@ class HelpSupportScreen extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.symmetric(vertical: AppSizer().height1),
       leading: CircleAvatar(
-        backgroundColor: AppColors.appBlack.withOpacity(0.4),
+        backgroundColor: AppColors.appBlack.withOpacity(0.6),
         child: Icon(icon, color: AppColors.appWhite),
       ),
       title: Text(
         title,
         style: TextStyle(
-          fontSize: AppSizer().fontSize14,
-          fontWeight: FontWeight.w500,
-          color: AppColors.appGrey.shade700,
+          fontSize: AppSizer().fontSize16,
+          fontWeight: FontWeight.w600,
+          color: AppColors.appGrey.shade900,
         ),
       ),
       subtitle: Text(
         subtitle,
         style: TextStyle(
-          fontSize: AppSizer().fontSize12,
-          color: Colors.grey[600],
+          fontSize: AppSizer().fontSize14,
+          color:AppColors.appGrey.shade700,
         ),
       ),
       onTap: onTap,

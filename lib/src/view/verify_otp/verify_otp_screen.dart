@@ -7,11 +7,19 @@ import 'package:olx_prototype/src/controller/verify_otp_controller.dart';
 class VerifyOtpScreen extends StatelessWidget {
   VerifyOtpScreen({super.key});
 
-  final VerifyOtpController controller = Get.put(VerifyOtpController(), permanent: false);
+  final VerifyOtpController controller =
+  Get.put(VerifyOtpController(), permanent: false);
+
   final _formKey = GlobalKey<FormState>();
 
   @override
   Widget build(BuildContext context) {
+    // ✅ phone number arguments se receive karke controller me set karo
+    final args = Get.arguments;
+    if (args != null && args['phone'] != null) {
+      controller.setPhone(args['phone']);
+    }
+
     return Scaffold(
       body: Container(
         height: AppSizer().height100,
@@ -57,6 +65,8 @@ class VerifyOtpScreen extends StatelessWidget {
                             ),
                           ),
                           SizedBox(height: AppSizer().height1),
+
+                          // ✅ yaha ab phone number dikhega
                           Text(
                             "OTP sent to: ${controller.phone}",
                             style: TextStyle(
@@ -88,32 +98,36 @@ class VerifyOtpScreen extends StatelessWidget {
                           ),
                           SizedBox(height: AppSizer().height4),
 
-                          Obx(() => InkWell(
-                            onTap: () {
-                              if (_formKey.currentState!.validate()) {
-                                controller.verifyOtp();
-                              }
-                            },
-                            child: Container(
-                              height: AppSizer().height6,
-                              decoration: BoxDecoration(
-                                color: AppColors.appGreen,
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: Center(
-                                child: controller.isLoading.value
-                                    ? const CircularProgressIndicator(color: AppColors.appWhite)
-                                    : Text(
-                                  "Verify OTP",
-                                  style: TextStyle(
+                          Obx(
+                                () => InkWell(
+                              onTap: () {
+                                if (_formKey.currentState!.validate()) {
+                                  controller.verifyOtp();
+                                }
+                              },
+                              child: Container(
+                                height: AppSizer().height6,
+                                decoration: BoxDecoration(
+                                  color: AppColors.appGreen,
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: Center(
+                                  child: controller.isLoading.value
+                                      ? const CircularProgressIndicator(
                                     color: AppColors.appWhite,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: AppSizer().fontSize18,
+                                  )
+                                      : Text(
+                                    "Verify OTP",
+                                    style: TextStyle(
+                                      color: AppColors.appWhite,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: AppSizer().fontSize18,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          )),
+                          ),
                           SizedBox(height: AppSizer().height2),
 
                           TextButton(

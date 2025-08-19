@@ -91,18 +91,6 @@ class AboutScreen extends StatelessWidget {
                 FeedbackDialog.showFeedbackDialog(context);
               },
             ),
-            // Privacy Policy
-            ListTile(
-              leading: Icon(Icons.privacy_tip_outlined, color: AppColors.appGrey.shade700),
-              title: Text(
-                "Privacy Policy",
-                style: TextStyle(fontSize: AppSizer().fontSize16, fontWeight: FontWeight.w600),
-              ),
-              onTap: () {
-                Get.toNamed(AppRoutes.privacy_screen);
-              },
-            ),
-
             // Rate app
             ListTile(
               leading: Icon(Icons.star_border_outlined, color: AppColors.appGrey.shade700),

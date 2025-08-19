@@ -28,6 +28,7 @@ class AppSizer {
   final double height26 = 26.h;
   final double height27 = 27.h;
   final double height28 = 28.h;
+  final double height29 = 29.h;
   final double height30 = 30.h;
   final double height32 = 32.h;
   final double height34 = 34.h;

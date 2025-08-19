@@ -18,6 +18,8 @@ class CarUploadController extends GetxController {
 
   RxList<File> selectedImages = <File>[].obs;
   RxBool isUploading = false.obs;
+  var selectedDealerType = "".obs;
+
 
   Future<void> uploadCarData() async {
     if (titleController.text.trim().isEmpty ||

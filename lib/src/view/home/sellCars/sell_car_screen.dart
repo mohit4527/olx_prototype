@@ -42,17 +42,53 @@ class SellCarScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(height: AppSizer().height6,),
-            Center(child: Text("Sell Your Car Here",style: TextStyle(color: AppColors.appBlack,fontWeight: FontWeight.bold,fontSize:AppSizer().fontSize18),)),
+            Center(child: Text("Sell Your Products",style: TextStyle(color: AppColors.appBlack,fontWeight: FontWeight.bold,fontSize:AppSizer().fontSize18),)),
             Divider(color: AppColors.appBlack,thickness: 2,),
             SizedBox(height: AppSizer().height5),
+            Text(
+              "Dealer Type",
+              style: TextStyle(
+                color: AppColors.appBlack,
+                fontSize: AppSizer().fontSize17,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: AppSizer().height1),
 
+            Obx(() => DropdownButtonFormField<String>(
+              value: controller.selectedDealerType.value.isEmpty
+                  ? null
+                  : controller.selectedDealerType.value,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius:BorderRadius.circular(10),
+                ),
+                hintStyle: TextStyle(color:AppColors.appGrey),
+                hintText: "Select Dealer Type",
+              ),
+              items: ["Cars", "Motor Cycles", "Trucks","Parts","Other"].map((type) {
+                return DropdownMenuItem<String>(
+                  value: type,
+                  child: Text(type),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  controller.selectedDealerType.value = value;
+                }
+              },
+            )),
+            SizedBox(height: AppSizer().height1),
             Text("Title",style:TextStyle(color: AppColors.appBlack,fontSize: AppSizer().fontSize17,fontWeight: FontWeight.w500),),
             SizedBox(height: AppSizer().height1),
             TextField(
               controller: controller.titleController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
+                hintStyle: TextStyle(color:AppColors.appGrey),
                 hintText: 'Enter car title',
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
              SizedBox(height: AppSizer().height1),
@@ -61,9 +97,12 @@ class SellCarScreen extends StatelessWidget {
             TextField(
               controller: controller.descriptionController,
               maxLines: 3,
-              decoration: const InputDecoration(
+              decoration:InputDecoration(
+                hintStyle: TextStyle(color:AppColors.appGrey),
                 hintText: 'Enter car description',
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
             SizedBox(height: AppSizer().height1),
@@ -72,13 +111,15 @@ class SellCarScreen extends StatelessWidget {
             TextField(
               controller: controller.priceController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
+              decoration:InputDecoration(
+                hintStyle: TextStyle(color:AppColors.appGrey),
                 hintText: 'Enter price',
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-
+            SizedBox(height:AppSizer().height1),
             ElevatedButton.icon(
               onPressed: pickImages,
               icon: const Icon(Icons.photo_library),
@@ -110,7 +151,6 @@ class SellCarScreen extends StatelessWidget {
               );
             }),
             const SizedBox(height: 24),
-
             Center(
               child: Obx(() => ElevatedButton(
                 onPressed: controller.isUploading.value ? null : controller.uploadCarData,
@@ -120,7 +160,6 @@ class SellCarScreen extends StatelessWidget {
                     : Text("Upload Car", style: TextStyle(fontSize: 16)),
               )),
             ),
-
           ],
         ),
       ),

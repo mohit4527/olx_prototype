@@ -62,6 +62,7 @@ class CommentBottomSheet extends StatelessWidget {
                       ),
                     );
                   }
+
                   return ListView.builder(
                     controller: scrollController,
                     itemCount: comments.length,
@@ -69,37 +70,65 @@ class CommentBottomSheet extends StatelessWidget {
                       final c = comments[index];
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: Row(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            CircleAvatar(
-                              backgroundColor: AppColors.appBlue,
-                              radius: 18,
-                              child: Text(
-                                c.userId.isNotEmpty
-                                    ? c.userId[0].toUpperCase()
-                                    : "?",
-                                style: const TextStyle(color: Colors.white),
-                              ),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: AppColors.appBlue,
+                                  radius: 18,
+                                  child: Text(
+                                    c.userId.isNotEmpty
+                                        ? c.userId[0].toUpperCase()
+                                        : "?",
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        c.userId,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.appWhite,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        c.text,
+                                        style: TextStyle(color: AppColors.appWhite),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    c.userId,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.appWhite,
-                                    ),
+
+                            // Reply button
+                            Padding(
+                              padding: const EdgeInsets.only(left: 46.0, top: 4),
+                              child: GestureDetector(
+                                onTap: () {
+                                  // Set input text with @username
+                                  controller.commentController.text = "@${c.userId} ";
+                                  controller.commentController.selection =
+                                      TextSelection.fromPosition(
+                                        TextPosition(
+                                            offset: controller.commentController.text.length),
+                                      );
+                                },
+                                child: Text(
+                                  "Reply",
+                                  style: TextStyle(
+                                    color: AppColors.appBlue,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    c.text,
-                                    style: TextStyle(color: AppColors.appWhite),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
                           ],
@@ -128,8 +157,7 @@ class CommentBottomSheet extends StatelessWidget {
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           hintText: 'Add a comment...',
-                          hintStyle:
-                          TextStyle(color: Colors.grey.shade400),
+                          hintStyle: TextStyle(color: Colors.grey.shade400),
                           border: InputBorder.none,
                         ),
                         cursorColor: AppColors.appBlue,
@@ -139,8 +167,7 @@ class CommentBottomSheet extends StatelessWidget {
                   IconButton(
                     icon: Icon(Icons.send, color: AppColors.appWhite),
                     onPressed: () {
-                      final text =
-                      controller.commentController.text.trim();
+                      final text = controller.commentController.text.trim();
                       if (text.isNotEmpty) {
                         controller.addComment(videoId, text);
                         controller.commentController.clear();

@@ -119,12 +119,6 @@ class HomeScreen extends StatelessWidget {
             },
             icon: Icon(Icons.notifications, color: AppColors.appGreen),
           ),
-          IconButton(
-            onPressed: () {
-              Get.to(ChatScreen());
-            },
-            icon: Icon(Icons.send, color: AppColors.appGreen),
-          ),
         ],
       ),
       drawer: Drawer(
@@ -424,125 +418,59 @@ class HomeScreen extends StatelessWidget {
                   right: AppSizer().height1,
                 ),
                 child: Text(
-                  "Browse Categories.",
-                  style: TextStyle(
-                    color: AppColors.appGreen,
-                    fontWeight: FontWeight.w600,
-                    fontSize: AppSizer().fontSize19,
-                  ),
-                ),
-              ),
-              SizedBox(height: AppSizer().height2),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Padding(
-                  padding: EdgeInsets.only(left: AppSizer().height1),
-                  child: Row(
-                    children: [
-                      InkWell(
-                        onTap: () {
-                          Get.toNamed(AppRoutes.carsMarket);
-                        },
-                        child: CategoryItem(
-                          imagePath: 'assets/images/car2.jpg',
-                          title: "Cars",
-                        ),
-                      ),
-                      SizedBox(width: AppSizer().width4),
-                      InkWell(
-                        onTap: () {
-                          Get.toNamed(AppRoutes.bikes_market);
-                        },
-                        child: CategoryItem(
-                          imagePath: 'assets/images/bike.jpeg',
-                          title: 'Bikes',
-                        ),
-                      ),
-                      SizedBox(width: AppSizer().width4),
-                      InkWell(
-                        onTap: () {
-                          Get.toNamed(AppRoutes.category);
-                        },
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.add,
-                              color: AppColors.appGreen,
-                              size: 30,
-                            ),
-                            Text(
-                              "Other Vehicle",
-                              style: TextStyle(
-                                color: AppColors.appGreen,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: AppSizer().height2),
-              Padding(
-                padding: EdgeInsets.only(
-                  left: AppSizer().height1,
-                  right: AppSizer().height1,
-                ),
-                child: Text(
                   "Recently Viewed.",
                   style: TextStyle(
                     color: AppColors.appGreen,
                     fontWeight: FontWeight.w600,
-                    fontSize: AppSizer().fontSize19,
+                    fontSize: AppSizer().fontSize18,
                   ),
                 ),
               ),
               SizedBox(height: AppSizer().height2),
-              SizedBox(
-                height: MediaQuery.of(context).size.height * 0.31,
-                child: Obx(() {
-                  if (productController.isLoading.value) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: productController.productList.length,
-                    itemBuilder: (context, index) {
-                      final product = productController.productList[index];
-                      final String imageUrl = product.mediaUrl.isNotEmpty
-                          ? "https://oldmarket.bhoomi.cloud/${product.mediaUrl.first}"
-                          : 'https://via.placeholder.com/150';
-                      return Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: AppSizer().width1,
-                        ),
-                        child: SizedBox(
-                          width: MediaQuery.of(context).size.width * 0.46,
-                          child: InkWell(
-                            onTap: () {
-                              Get.toNamed(
-                                AppRoutes.description,
-                                arguments: product,
-                              );
-                            },
-                            child: ProductCard(
-                              imagePath: imageUrl,
-                              roomInfo: product.title,
-                              price: "₹ ${product.price}",
-                              description: product.description,
-                              location: product.location.city,
-                              date: formatDate(product.createdAt),
-                            ),
+          SizedBox(
+            child: Obx(() {
+              if (productController.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              return SizedBox(
+                height: AppSizer().height30,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: productController.productList.length,
+                  itemBuilder: (context, index) {
+                    final product = productController.productList[index];
+                    final String imageUrl = product.mediaUrl.isNotEmpty
+                        ? "https://oldmarket.bhoomi.cloud/${product.mediaUrl.first}"
+                        : 'https://via.placeholder.com/150';
+                    return Padding(
+                      padding: EdgeInsets.symmetric(horizontal: AppSizer().width1),
+                      child: AspectRatio(
+                        aspectRatio: 2.2/3,
+                        child: InkWell(
+                          onTap: () {
+                            Get.toNamed(
+                              AppRoutes.description,
+                              arguments: product.id,
+                            );
+
+                          },
+                          child: ProductCard(
+                            imagePath: imageUrl,
+                            roomInfo: product.title,
+                            price: "₹ ${product.price}",
+                            description: product.description,
+                            location: product.location.city,
+                            date: formatDate(product.createdAt),
                           ),
                         ),
-                      );
-                    },
-                  );
-                }),
-              ),
-              SizedBox(height: AppSizer().height2),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }),
+          ),
+          SizedBox(height: AppSizer().height2),
               Padding(
                 padding: EdgeInsets.only(
                   left: AppSizer().height1,
@@ -553,7 +481,7 @@ class HomeScreen extends StatelessWidget {
                   style: TextStyle(
                     color: AppColors.appGreen,
                     fontWeight: FontWeight.w600,
-                    fontSize: AppSizer().fontSize19,
+                    fontSize: AppSizer().fontSize18,
                   ),
                 ),
               ),
@@ -583,7 +511,10 @@ class HomeScreen extends StatelessWidget {
 
                     return InkWell(
                       onTap: () {
-                        Get.toNamed(AppRoutes.description, arguments: product);
+                        Get.toNamed(
+                          AppRoutes.description,
+                          arguments: product.id,
+                        );
                       },
                       child: ProductCard(
                         imagePath: imageUrl,
@@ -612,16 +543,24 @@ class HomeScreen extends StatelessWidget {
           unselectedItemColor: AppColors.appBlack,
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.shopping_cart),
-              label: "Old Market",
+              icon: Icon(Icons.home),
+              label: "Home",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.category),
+              label: "Category",
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.play_circle_filled),
-              label: "Video Market",
+              label: "Short Video",
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.directions_car),
-              label: "Car Market",
+              icon: Icon(Icons.ads_click),
+              label: "My Aids",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.message),
+              label: "Chat",
             ),
           ],
         ),

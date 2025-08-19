@@ -533,7 +533,7 @@ class DescriptionScreen extends StatelessWidget {
                   ),
                   SizedBox(height: AppSizer().height2,),
                   SizedBox(
-                    height: AppSizer().height28,
+                    height: AppSizer().height29,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: productList.length,

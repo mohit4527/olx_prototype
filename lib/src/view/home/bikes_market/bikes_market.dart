@@ -78,7 +78,7 @@ class BikesMarket extends StatelessWidget {
           itemCount: carList.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 1,
-            childAspectRatio: 1.2,
+            childAspectRatio: 1.3,
             crossAxisSpacing: 5,
             mainAxisSpacing: 14,
           ),

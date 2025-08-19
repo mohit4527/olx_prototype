@@ -4,9 +4,11 @@ import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
 import 'package:olx_prototype/src/controller/short_video_controller.dart';
 import '../../../controller/share_video_Controller.dart';
+import '../../../controller/token_controller.dart';
 import '../../../custom_widgets/comment_box.dart';
-import '../../../custom_widgets/share_video_bottomsheet.dart';
 import '../../../custom_widgets/shortVideoWidget.dart';
+import '../../../services/auth_service/auth_service.dart';
+import '../../../utils/app_routes.dart';
 import '../description/description_screen.dart';
 
 class ShortvideoScreen extends StatelessWidget {
@@ -42,6 +44,8 @@ class ShortvideoScreen extends StatelessWidget {
                 }
               }),
             ),
+
+            // 🔙 Back Button
             Positioned(
               left: AppSizer().width1,
               top: AppSizer().height2,
@@ -52,34 +56,31 @@ class ShortvideoScreen extends StatelessWidget {
                 icon: const Icon(Icons.arrow_back, color: AppColors.appWhite),
               ),
             ),
+
+            // ❤️ Like, 💬 Comment, 📤 Share
             Positioned(
               bottom: AppSizer().height25,
               right: AppSizer().width2,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // ... inside your Column widget
+                  // ❤️ Like
                   Obx(() {
                     final currentIndex = videoController.currentIndex.value;
-
                     if (videoController.videoList.isEmpty || currentIndex >= videoController.videoList.length) {
                       return const SizedBox.shrink();
                     }
 
                     final video = videoController.videoList[currentIndex];
-                    final currentUserId = videoController.userId; // Assuming userId is available here
+                    final currentUserId = videoController.userId;
 
-                    // Ensure userId is not null before proceeding
-                    if (currentUserId == null) {
-                      return const SizedBox.shrink(); // Or show a login message
-                    }
+                    if (currentUserId == null) return const SizedBox.shrink();
 
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         InkWell(
                           onTap: () {
-                            // Pass both the video ID and the current user's ID
                             videoController.likeUnlikeVideo(video.id, currentUserId);
                           },
                           child: Icon(
@@ -93,8 +94,8 @@ class ShortvideoScreen extends StatelessWidget {
                           onTap: () {
                             Get.dialog(
                               AlertDialog(
-                                title:  Text("Likes"),
-                                content: Container(
+                                title: const Text("Likes"),
+                                content: SizedBox(
                                   width: double.maxFinite,
                                   child: ListView.builder(
                                     shrinkWrap: true,
@@ -113,25 +114,22 @@ class ShortvideoScreen extends StatelessWidget {
                           },
                           child: Text(
                             "${video.likedByUsers.length} Like${video.likedByUsers.length == 1 ? '' : 's'}",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                            ),
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
                           ),
                         ),
                       ],
                     );
                   }),
+
                   SizedBox(height: AppSizer().height5),
+
+                  // 💬 Comment
                   Obx(() {
                     final currentIndex = videoController.currentIndex.value;
-
                     if (videoController.videoList.isEmpty || currentIndex >= videoController.videoList.length) {
                       return const SizedBox.shrink();
                     }
-
                     final video = videoController.videoList[currentIndex];
-
                     return IconButton(
                       icon: const Icon(Icons.comment, color: Colors.white, size: 30),
                       onPressed: () {
@@ -143,28 +141,52 @@ class ShortvideoScreen extends StatelessWidget {
                       },
                     );
                   }),
+
                   SizedBox(height: AppSizer().height5),
+                  // 📤 Share
                   IconButton(
                     icon: const Icon(Icons.share, color: Colors.white, size: 30),
-                    onPressed: () {
+                    onPressed: () async {
                       final currentIndex = videoController.currentIndex.value;
-                      if (currentIndex < videoController.videoList.length) {
-                        final video = videoController.videoList[currentIndex];
-                        Get.bottomSheet(
-                          ShareBottomSheet(
-                            videoId: video.id,
-                            userId: "6884b95f75b9d6e99ab5537e",
-                          ),
-                          backgroundColor: Colors.transparent,
-                          isScrollControlled: true,
+                      if (currentIndex >= videoController.videoList.length) return;
+
+                      final video = videoController.videoList[currentIndex];
+
+                      final loggedInUserId = await AuthService.getLoggedInUserId() ?? "";
+
+                      String token;
+                      if (Get.isRegistered<TokenController>()) {
+                        token = Get.find<TokenController>().token.value;
+                      } else {
+                        token = (await AuthService.getToken()) ?? "";
+                        Get.put(TokenController(), permanent: true).token.value = token;
+                      }
+
+                      if (loggedInUserId.isEmpty || token.isEmpty) {
+                        Get.snackbar("Error", "User not logged in or token missing!");
+                        return;
+                      }
+
+                      try {
+                        await shareVideoController.shareVideo(
+                          video.id,
+                          loggedInUserId,
+                          token,
                         );
+                        Get.snackbar("Success", "Video shared successfully!");
+                      } catch (e) {
+                        Get.snackbar("Error", "Failed to share video: $e",backgroundColor: AppColors.appGreen);
                       }
                     },
                   ),
+
+
                   SizedBox(height: AppSizer().height5),
                 ],
               ),
             ),
+
+            // 👇 User Info + Buy button
             Positioned(
               bottom: AppSizer().height8,
               left: AppSizer().width2,
@@ -180,7 +202,11 @@ class ShortvideoScreen extends StatelessWidget {
                       SizedBox(width: AppSizer().width3),
                       Text(
                         '@username',
-                        style: TextStyle(color: AppColors.appWhite, fontSize: AppSizer().fontSize16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: AppColors.appWhite,
+                          fontSize: AppSizer().fontSize16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -211,6 +237,15 @@ class ShortvideoScreen extends StatelessWidget {
                         ),
                         InkWell(
                           onTap: () {
+                            final currentIndex = videoController.currentIndex.value;
+                            if (currentIndex >= videoController.videoList.length) return;
+                            final v = videoController.videoList[currentIndex];
+
+                            final String selectedCarId =
+                            (v.productId != null && v.productId.toString().isNotEmpty)
+                                ? v.productId.toString()
+                                : v.id.toString();
+
                             showModalBottomSheet(
                               context: context,
                               backgroundColor: AppColors.appBlack.withOpacity(0.95),
@@ -262,7 +297,10 @@ class ShortvideoScreen extends StatelessWidget {
                                         alignment: Alignment.centerRight,
                                         child: ElevatedButton(
                                           onPressed: () {
-                                            Get.to(() =>  DescriptionScreen(carId:''));
+                                            Get.toNamed(
+                                              AppRoutes.description,
+                                              arguments: selectedCarId,
+                                            );
                                           },
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: AppColors.appGreen,

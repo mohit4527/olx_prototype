@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
 import 'package:olx_prototype/src/custom_widgets/dealer_screen_widgets.dart';
 import '../../../constants/app_colors.dart';
@@ -19,6 +21,11 @@ class DealerProfileScreen extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
+        leading: IconButton(onPressed: (){
+          Get.back();
+        },
+            icon:Icon(Icons.arrow_back,color: AppColors.appWhite,),
+        ),
         backgroundColor: AppColors.appGreen,
       ),
       body: Container(
@@ -37,11 +44,12 @@ class DealerProfileScreen extends StatelessWidget {
           children: [
             AppCustomWidgets.sectionTitle("Business Information"),
             AppCustomWidgets.buildTextField("Business Name",Icon(Icons.business_center)),
-            AppCustomWidgets.buildTextField("Business Address",Icon(Icons.pin_drop)),
+            AppCustomWidgets.buildTextField("Registration Number",Icon(Icons.pin)),
+            AppCustomWidgets.buildTextField("GST Number",Icon(Icons.pin)),
             SizedBox(height: AppSizer().height1),
             Row(
               children: [
-                Expanded(child: AppCustomWidgets.buildDropdown("City...")),
+                Expanded(child: AppCustomWidgets.buildDropdown("Village...")),
                 SizedBox(width: AppSizer().width2),
                 Expanded(child: AppCustomWidgets.buildDropdown("City...")),
               ],
@@ -57,6 +65,8 @@ class DealerProfileScreen extends StatelessWidget {
             SizedBox(height: AppSizer().height2),
             AppCustomWidgets.buildTextField("Phone Number",Icon(Icons.phone_android)),
             AppCustomWidgets.buildTextField("Email Address",Icon(Icons.mail)),
+            AppCustomWidgets.buildTextField("Business Address",Icon(Icons.pin_drop)),
+
 
             AppCustomWidgets.sectionTitle("Dealer Type"),
             SizedBox(height: AppSizer().height1,),
@@ -118,8 +128,7 @@ class DealerProfileScreen extends StatelessWidget {
                 AppCustomWidgets.buildChip("Mobile Payment"),
               ],
             ),
-
-            SizedBox(height: AppSizer().height5),
+            SizedBox(height: AppSizer().height6),
             SizedBox(
               height: AppSizer().height6,
               width: double.infinity,
@@ -141,7 +150,7 @@ class DealerProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(height: AppSizer().height2),
+            SizedBox(height: AppSizer().height8),
           ],
         ),
       ),

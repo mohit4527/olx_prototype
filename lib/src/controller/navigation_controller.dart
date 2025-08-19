@@ -16,10 +16,16 @@ class NavigationController extends GetxController {
         Get.to(HomeScreen());
         break;
       case 1:
-        Get.toNamed(AppRoutes.shortVideo);
+        Get.toNamed(AppRoutes.category);
         break;
       case 2:
-        Get.to(CarsMarket());
+        Get.toNamed(AppRoutes.shortVideo);
+        break;
+        case 3:
+        Get.toNamed(AppRoutes.aids_screen);
+        break;
+        case 4:
+        Get.toNamed(AppRoutes.chat);
         break;
     }
   }

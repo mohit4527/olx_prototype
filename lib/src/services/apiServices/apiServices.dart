@@ -204,7 +204,6 @@ class ApiService {
 
 
   //verify OTP
-
   static Future<Map<String, dynamic>> verifyOtp(String phone,
       String otp,) async {
     final response = await http.post(
@@ -326,28 +325,62 @@ class ApiService {
 
 
 
-
-  //share Video Api
   static const String baseUrl3 = "https://oldmarket.bhoomi.cloud/api";
 
-  static Future<ShareVideoResponse> shareVideo({
+  // ✅ Share Video API
+  static Future<SharedVideo> shareVideo({
     required String videoId,
     required String userId,
+    required String token,
   }) async {
     final url = Uri.parse("$baseUrl3/videos/$videoId/share");
 
     final response = await http.post(
       url,
       headers: {
+        "Authorization": "Bearer $token",
         "Content-Type": "application/json",
       },
       body: jsonEncode({"userId": userId}),
     );
 
     if (response.statusCode == 200) {
-      return ShareVideoResponse.fromJson(jsonDecode(response.body));
+      final data = jsonDecode(response.body);
+
+      // agar response me sharedWith hai to usko parse karna hai
+      if (data["sharedWith"] != null && data["sharedWith"] is List) {
+        return SharedVideo.fromJson(data["sharedWith"][0]);
+      } else {
+        throw Exception("❌ Unexpected response format: ${response.body}");
+      }
     } else {
-      throw Exception("Failed to share video");
+      throw Exception("❌ Failed to share video: ${response.body}");
+    }
+  }
+
+  // ✅ Get Shared Videos API
+  static Future<List<SharedVideo>> getSharedVideos(String token) async {
+    final url = Uri.parse("$baseUrl3/videos/shared");
+
+    final response = await http.get(
+      url,
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      if (data["sharedWith"] != null && data["sharedWith"] is List) {
+        return (data["sharedWith"] as List)
+            .map((json) => SharedVideo.fromJson(json))
+            .toList();
+      } else {
+        return [];
+      }
+    } else {
+      throw Exception("❌ Failed to fetch shared videos: ${response.body}");
     }
   }
 

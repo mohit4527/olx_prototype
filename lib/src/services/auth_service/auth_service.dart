@@ -5,4 +5,10 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('userId');
   }
+
+  // helpful:
+  static Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('token');
+  }
 }

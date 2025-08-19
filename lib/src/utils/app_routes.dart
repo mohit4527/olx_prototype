@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:olx_prototype/src/view/home/aids_screen/aids_screen.dart';
 import 'package:olx_prototype/src/view/home/bikes_market/bikes_market.dart';
 import 'package:olx_prototype/src/view/home/cars_market/cars_market.dart';
 import 'package:olx_prototype/src/view/home/category/category_screen.dart';
@@ -41,6 +42,7 @@ class AppRoutes {
   static String category = "/category_screen";
   static String dealer = "/dealer_screen";
   static String bikes_market = "/bikes_market";
+  static String aids_screen = "/aids_screen";
 }
 
 final Getpages = [
@@ -53,7 +55,7 @@ final Getpages = [
   GetPage(
     name: AppRoutes.description,
     page: () {
-      final String carId = Get.arguments as String;
+      final String carId = (Get.arguments ?? '') as String;
       return DescriptionScreen(carId: carId,);
     },
   ),
@@ -71,4 +73,5 @@ final Getpages = [
   GetPage(name: AppRoutes.category, page: () => CategoryScreen()),
   GetPage(name: AppRoutes.dealer, page: () => DealerProfileScreen()),
   GetPage(name: AppRoutes.bikes_market, page: () => BikesMarket()),
+  GetPage(name: AppRoutes.aids_screen, page: () => MyAidsScreen()),
 ];

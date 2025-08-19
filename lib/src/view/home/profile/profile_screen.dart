@@ -98,7 +98,7 @@ class ProfilePage extends StatelessWidget {
                             fontSize: AppSizer().fontSize16)),
                     subtitle: Text(entry.value,
                         style: TextStyle(
-                            color: Colors.grey.shade800,
+                            color: Colors.grey,
                             fontSize: AppSizer().fontSize15)),
                     trailing: IconButton(
                       icon: const Icon(Icons.edit, color: AppColors.appGreen),

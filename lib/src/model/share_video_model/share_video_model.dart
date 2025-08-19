@@ -1,47 +1,24 @@
-class ShareVideoResponse {
-  final bool status;
-  final String message;
-  final List<SharedWith> sharedWith;
-  final String videoUrl;
-
-  ShareVideoResponse({
-    required this.status,
-    required this.message,
-    required this.sharedWith,
-    required this.videoUrl,
-  });
-
-  factory ShareVideoResponse.fromJson(Map<String, dynamic> json) {
-    return ShareVideoResponse(
-      status: json['status'] ?? false,
-      message: json['message'] ?? '',
-      sharedWith: (json['sharedWith'] as List? ?? [])
-          .map((e) => SharedWith.fromJson(e))
-          .toList(),
-      videoUrl: json['videoUrl'] ?? '',
-    );
-  }
-}
-
-class SharedWith {
+// ==================== share_video_model.dart ====================
+class SharedVideo {
   final String user;
   final String sharedBy;
   final String sharedAt;
-  final String id;
+  final String video;
 
-  SharedWith({
+
+  SharedVideo({
     required this.user,
     required this.sharedBy,
     required this.sharedAt,
-    required this.id,
+    required this.video,
   });
 
-  factory SharedWith.fromJson(Map<String, dynamic> json) {
-    return SharedWith(
-      user: json['user'] ?? '',
-      sharedBy: json['sharedBy'] ?? '',
-      sharedAt: json['sharedAt'] ?? '',
-      id: json['_id'] ?? '',
+  factory SharedVideo.fromJson(Map<String, dynamic> json) {
+    return SharedVideo(
+      user: json["user"] ?? "",
+      sharedBy: json["sharedBy"] ?? "",
+      sharedAt: json["sharedAt"] ?? "",
+      video: json["video"] ?? "",
     );
   }
 }

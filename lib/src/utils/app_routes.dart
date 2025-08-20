@@ -6,12 +6,13 @@ import 'package:olx_prototype/src/view/home/category/category_screen.dart';
 import 'package:olx_prototype/src/view/home/chat/chat_screen.dart';
 import 'package:olx_prototype/src/view/home/dealer/dealer_screen.dart';
 import 'package:olx_prototype/src/view/home/description/description_screen.dart';
+import 'package:olx_prototype/src/view/home/edit_dealer_profile/edit_dealer_profile_screen.dart';
 import 'package:olx_prototype/src/view/home/history/history_screen.dart';
 import 'package:olx_prototype/src/view/home/home_screen.dart';
 import 'package:olx_prototype/src/view/home/logout/logout_screen.dart';
 import 'package:olx_prototype/src/view/home/notifications/notification_screen.dart';
 import 'package:olx_prototype/src/view/home/profile/profile_screen.dart';
-import 'package:olx_prototype/src/view/home/sellCars/sell_car_screen.dart';
+import 'package:olx_prototype/src/view/home/sell_dealer_cars/sell_dealer_car_screen.dart';
 import 'package:olx_prototype/src/view/home/setting/about/about_screen.dart';
 import 'package:olx_prototype/src/view/home/setting/help_support/help_support_screen.dart';
 import 'package:olx_prototype/src/view/home/setting/privacy_screen/privacy_screen.dart';
@@ -20,6 +21,8 @@ import 'package:olx_prototype/src/view/home/shortVideo/shortVideo_screen.dart';
 import 'package:olx_prototype/src/view/login/log_in_screen.dart';
 import 'package:olx_prototype/src/view/splash/splash_screen.dart';
 import 'package:olx_prototype/src/view/verify_otp/verify_otp_screen.dart';
+
+import '../view/home/sell_user_cars/sell_user_car_screen.dart';
 
 class AppRoutes {
   static String splash = "/splash_screen";
@@ -33,7 +36,8 @@ class AppRoutes {
   static String shortVideo = "/shortVideo_screen";
   static String logout = "/logout_screen";
   static String about = "/about_screen";
-  static String sellCars = "/sell_car_screen";
+  static String sell_user_cars = "/sell_user_car_screen";
+  static String sell_dealer_cars = "/sell_dealer_car_screen";
   static String notifications = "/notification_screen";
   static String history = "/history_screen";
   static String verify_otp = "/verify_otp_screen";
@@ -43,6 +47,7 @@ class AppRoutes {
   static String dealer = "/dealer_screen";
   static String bikes_market = "/bikes_market";
   static String aids_screen = "/aids_screen";
+  static String edit_dealer_profile = "/edit_dealer_profile_screen";
 }
 
 final Getpages = [
@@ -64,7 +69,8 @@ final Getpages = [
   GetPage(name: AppRoutes.carsMarket, page: () => CarsMarket()),
   GetPage(name: AppRoutes.setting, page: () => SettingScreen()),
   GetPage(name: AppRoutes.about, page: () => AboutScreen()),
-  GetPage(name: AppRoutes.sellCars, page: () => SellCarScreen()),
+  GetPage(name: AppRoutes.sell_user_cars, page: () => SellUserCarScreen()),
+  GetPage(name: AppRoutes.sell_dealer_cars, page: () => SellDealerCarScreen()),
   GetPage(name: AppRoutes.notifications, page: () => NotificationScreen()),
   GetPage(name: AppRoutes.history, page: () => HistoryScreen()),
   GetPage(name: AppRoutes.verify_otp, page: () => VerifyOtpScreen()),
@@ -74,4 +80,5 @@ final Getpages = [
   GetPage(name: AppRoutes.dealer, page: () => DealerProfileScreen()),
   GetPage(name: AppRoutes.bikes_market, page: () => BikesMarket()),
   GetPage(name: AppRoutes.aids_screen, page: () => MyAidsScreen()),
+  GetPage(name: AppRoutes.edit_dealer_profile, page: () => EditDealerProfilePage()),
 ];

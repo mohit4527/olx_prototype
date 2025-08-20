@@ -14,6 +14,7 @@ import '../../model/make_offer_model/make_offer_model.dart';
 import '../../model/product_description_model/product_description model.dart';
 import '../../model/sell_car_model/sell_car_model.dart';
 import '../../model/share_video_model/share_video_model.dart';
+import '../auth_service/auth_service.dart';
 
 class ApiService {
   // Description Screen ApiService
@@ -273,7 +274,6 @@ class ApiService {
 
 
   //Video like api
-
   static Future<Map<String, dynamic>?> likeUnlikeVideo(String videoId) async {
     final url = Uri.parse(
         'https://oldmarket.bhoomi.cloud/api/videos/$videoId/like');
@@ -385,6 +385,75 @@ class ApiService {
   }
 
 
+
+
+
+  // register dealer profile
+
+  Future<Map<String, dynamic>> registerDealer({
+    required Map<String, dynamic> data,
+    File? businessLogo,
+    List<File>? businessPhotos,
+  }) async {
+    final uri = Uri.parse('http://oldmarket.bhoomi.cloud/api/dealers/register');
+    var request = http.MultipartRequest('POST', uri);
+
+    final token = await AuthService.getToken();
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+
+    // Iterate through the data map and add fields to the request
+    data.forEach((key, value) {
+      if (value is List) {
+        // For lists like paymentMethods, add each item with the same key
+        // Server will likely interpret this as a list/array
+        for (var item in value) {
+          request.fields[key + '[]'] = item.toString(); // Use key[] format for arrays
+        }
+      } else {
+        request.fields[key] = value.toString();
+      }
+    });
+
+    // Handle businessLogo file upload
+    if (businessLogo != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'businessLogo',
+          businessLogo.path,
+          contentType: MediaType('image', 'jpeg'),
+        ),
+      );
+    }
+
+    // Handle multiple businessPhotos file uploads
+    if (businessPhotos != null) {
+      for (var photo in businessPhotos) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'businessPhotos', // Use a consistent key for all photos
+            photo.path,
+            contentType: MediaType('image', 'jpeg'),
+          ),
+        );
+      }
+    }
+
+    try {
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      final decodedResponse = jsonDecode(responseBody);
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return decodedResponse;
+      } else {
+        throw Exception('Failed to register dealer: ${response.statusCode}. Server Message: ${decodedResponse['message'] ?? 'No message'}');
+      }
+    } catch (e) {
+      throw Exception('Failed to connect to the server: $e');
+    }
+  }
 }
 
 

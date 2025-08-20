@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
 
@@ -18,13 +19,24 @@ class AppCustomWidgets {
     );
   }
 
-  /// ------- Text Field ------
-  static Widget buildTextField(String hint,Icon) {
+  /// ------- Text Field with Controller + Validation + InputFormatter ------
+  static Widget buildTextField(
+      String hint,
+      Icon icon, {
+        TextEditingController? controller,
+        String? Function(String?)? validator,
+        TextInputType keyboardType = TextInputType.text,
+        List<TextInputFormatter>? inputFormatters, // <-- NEW
+      }) {
     return Padding(
       padding: EdgeInsets.only(bottom: AppSizer().height1),
-      child: TextField(
+      child: TextFormField(
+        controller: controller,
+        validator: validator,
+        keyboardType: keyboardType,
+        inputFormatters: inputFormatters, // <-- NEW
         decoration: InputDecoration(
-          prefixIcon: Icon,
+          prefixIcon: icon,
           hintText: hint,
           hintStyle: TextStyle(color: AppColors.appGrey.shade800),
           border: OutlineInputBorder(
@@ -41,7 +53,8 @@ class AppCustomWidgets {
   }
 
   /// ------ Dropdown ------
-  static Widget buildDropdown(String hint) {
+  static Widget buildDropdown(String hint, List<String> items,
+      {String? value, void Function(String?)? onChanged}) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: AppSizer().width2),
       decoration: BoxDecoration(
@@ -51,23 +64,35 @@ class AppCustomWidgets {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           hint: Text(hint),
+          value: value,
           iconEnabledColor: AppColors.appGreen,
-          items: const [],
-          onChanged: (value) {},
+          items: items
+              .map((e) => DropdownMenuItem(
+            value: e,
+            child: Text(e),
+          ))
+              .toList(),
+          onChanged: onChanged,
         ),
       ),
     );
   }
 
-  /// ------ Text Area ------
-  static Widget buildTextArea(String hint) {
+  /// ------ Text Area with Controller ------
+  static Widget buildTextArea(
+      String hint, {
+        TextEditingController? controller,
+        String? Function(String?)? validator,
+      }) {
     return Container(
       padding: EdgeInsets.all(AppSizer().width2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppSizer().height1),
         border: Border.all(color: AppColors.appGrey.shade700),
       ),
-      child: TextField(
+      child: TextFormField(
+        controller: controller,
+        validator: validator,
         maxLines: 4,
         decoration: InputDecoration.collapsed(hintText: hint),
       ),
@@ -82,7 +107,7 @@ class AppCustomWidgets {
       decoration: BoxDecoration(
         color: isSelected ? AppColors.appGreen : AppColors.appWhite,
         borderRadius: BorderRadius.circular(AppSizer().height3),
-        border: Border.all(color: AppColors.appGrey.shade700)
+        border: Border.all(color: AppColors.appGrey.shade700),
       ),
       child: Center(
         child: Text(
@@ -105,7 +130,7 @@ class AppCustomWidgets {
         borderRadius: BorderRadius.circular(AppSizer().height1),
         border: Border.all(color: AppColors.appGrey.shade700),
       ),
-      child:  Icon(Icons.add_a_photo, color: AppColors.appGrey.shade700),
+      child: Icon(Icons.add_a_photo, color: AppColors.appGrey.shade700),
     );
   }
 

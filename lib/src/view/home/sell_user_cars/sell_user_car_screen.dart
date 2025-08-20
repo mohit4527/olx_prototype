@@ -6,8 +6,8 @@ import 'package:olx_prototype/src/constants/app_sizer.dart';
 import '../../../constants/app_colors.dart';
 import '../../../controller/sell_car_controller.dart';
 
-class SellCarScreen extends StatelessWidget {
-  SellCarScreen({super.key});
+class SellUserCarScreen extends StatelessWidget {
+  SellUserCarScreen({super.key});
 
   final CarUploadController controller = Get.put(CarUploadController());
 
@@ -27,6 +27,15 @@ class SellCarScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+        appBar: AppBar(title:
+        Text("Sell Car as a Dealer",style: TextStyle(color: AppColors.appWhite,fontWeight: FontWeight.w500),),
+          centerTitle: true,
+          backgroundColor: AppColors.appGreen,
+          leading:IconButton(onPressed: (){
+            Get.back();
+          },
+              icon:Icon(Icons.arrow_back,color: AppColors.appWhite,)),
+        ),
       body: Container(
         height:AppSizer().height100,
     decoration: BoxDecoration(
@@ -41,10 +50,7 @@ class SellCarScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(height: AppSizer().height6,),
-            Center(child: Text("Sell Your Products",style: TextStyle(color: AppColors.appBlack,fontWeight: FontWeight.bold,fontSize:AppSizer().fontSize18),)),
-            Divider(color: AppColors.appBlack,thickness: 2,),
-            SizedBox(height: AppSizer().height5),
+            SizedBox(height: AppSizer().height3),
             Text(
               "Dealer Type",
               style: TextStyle(
@@ -128,8 +134,7 @@ class SellCarScreen extends StatelessWidget {
                 backgroundColor: Colors.blueAccent,
               ),
             ),
-            const SizedBox(height: 10),
-
+             SizedBox(height:AppSizer().height1),
             Obx(() {
               if (controller.selectedImages.isEmpty) {
                 return const Text("No images selected.");
@@ -150,14 +155,14 @@ class SellCarScreen extends StatelessWidget {
                     .toList(),
               );
             }),
-            const SizedBox(height: 24),
+            SizedBox(height:AppSizer().height2),
             Center(
               child: Obx(() => ElevatedButton(
                 onPressed: controller.isUploading.value ? null : controller.uploadCarData,
                 style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(horizontal: 40, vertical: 14), backgroundColor: Colors.green),
                 child: controller.isUploading.value
                     ? CircularProgressIndicator(color: Colors.white)
-                    : Text("Upload Car", style: TextStyle(fontSize: 16)),
+                    : Text("Upload Car", style: TextStyle(fontSize:AppSizer().fontSize16)),
               )),
             ),
           ],

@@ -25,7 +25,7 @@ class ProductCard extends StatelessWidget {
     double cardWidth = MediaQuery.of(context).size.width * 0.55;
 
     return Card(
-      elevation: 2,
+      elevation: 5,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(5),
       ),

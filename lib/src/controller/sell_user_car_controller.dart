@@ -1,12 +1,7 @@
 import 'dart:io';
-
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
-import 'package:get/get_rx/src/rx_types/rx_types.dart';
-import 'package:get/get_state_manager/src/simple/get_controllers.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
-
 import '../model/sell_car_model/sell_car_model.dart';
 import '../services/apiServices/apiServices.dart';
 import '../services/auth_service/auth_service.dart';
@@ -25,6 +20,7 @@ class CarUploadController extends GetxController {
     if (titleController.text.trim().isEmpty ||
         descriptionController.text.trim().isEmpty ||
         priceController.text.trim().isEmpty ||
+        selectedDealerType.value.isEmpty ||
         selectedImages.isEmpty) {
       Get.snackbar("Error", "Please fill all fields & select images");
       return;
@@ -40,11 +36,11 @@ class CarUploadController extends GetxController {
 
     isUploading.value = true;
 
-    final carData = CarProductModel(
+    final carData = SellUserCarModel(
       title: titleController.text.trim(),
       description: descriptionController.text.trim(),
       price: int.parse(priceController.text.trim()),
-      mediaUrl: [],
+      dealerType: selectedDealerType.value,
       type: 'image',
       userId: userId,
       location: Location(

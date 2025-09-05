@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "893683420686",
+    "project_id": "old-market-87ecd",
+    "storage_bucket": "old-market-87ecd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:893683420686:android:6f755e3dce5ecb0a06365f",
+        "android_client_info": {
+          "package_name": "com.example.olx_prototype"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZ5rQ1qWt7SGio2kjJ0p3IvtsWtuYHOTk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

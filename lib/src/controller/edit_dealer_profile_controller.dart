@@ -1,11 +1,9 @@
 // lib/src/controller/edit_dealer_profile_controller.dart
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // Add this
+import 'package:shared_preferences/shared_preferences.dart';
 
 class EditDealerProfileController extends GetxController {
   final businessNameController = TextEditingController();
@@ -32,12 +30,55 @@ class EditDealerProfileController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Load saved data when the controller is initialized
-    loadProfileDataFromSharedPreferences();
+    print("EditDealerProfileController initialized");
+    if (Get.arguments != null && Get.arguments is Map<String, dynamic>) {
+      print("Loading data from arguments");
+      _loadFromArguments(Get.arguments as Map<String, dynamic>);
+    } else {
+      print("Loading data from SharedPreferences");
+      loadProfileDataFromSharedPreferences();
+    }
+  }
+
+  void _loadFromArguments(Map<String, dynamic> data) {
+    print("Data received from arguments: $data");
+    businessNameController.text = data['businessName'] ?? '';
+    regNoController.text = data['regNo'] ?? '';
+    gstNoController.text = data['gstNo'] ?? '';
+    villageController.text = data['village'] ?? '';
+    cityController.text = data['city'] ?? '';
+    stateController.text = data['state'] ?? '';
+    countryController.text = data['country'] ?? '';
+    phoneController.text = data['phone'] ?? '';
+    emailController.text = data['email'] ?? '';
+    addressController.text = data['address'] ?? '';
+    descriptionController.text = data['description'] ?? '';
+    selectedDealerType.value = data['selectedDealerType'] ?? '';
+    if (data['selectedPayments'] is List<dynamic>) {
+      selectedPayments.assignAll(List<String>.from(data['selectedPayments']));
+    }
+    businessHours.value = data['businessHours'] ?? '';
+
+    final logoPath = data['businessLogoPath'];
+    if (logoPath != null && File(logoPath).existsSync()) {
+      businessLogo.value = File(logoPath);
+      print("Business logo loaded from path: $logoPath");
+    }
+
+    if (data['businessPhotoPaths'] != null) {
+      businessPhotos.assignAll(
+        (data['businessPhotoPaths'] as List<dynamic>)
+            .map((p) => File(p))
+            .where((f) => f.existsSync())
+            .toList(),
+      );
+      print("Business photos loaded from paths: ${businessPhotos.map((f) => f.path).toList()}");
+    }
   }
 
   Future<void> loadProfileDataFromSharedPreferences() async {
     final prefs = await SharedPreferences.getInstance();
+    print("Loading profile from SharedPreferences");
     businessNameController.text = prefs.getString('businessName') ?? '';
     regNoController.text = prefs.getString('regNo') ?? '';
     gstNoController.text = prefs.getString('gstNo') ?? '';
@@ -53,56 +94,19 @@ class EditDealerProfileController extends GetxController {
     selectedDealerType.value = prefs.getString('selectedDealerType') ?? '';
     final savedPayments = prefs.getStringList('selectedPayments');
     if (savedPayments != null) selectedPayments.assignAll(savedPayments);
+
     businessHours.value = prefs.getString('businessHours') ?? '';
 
-    final savedLogoPath = prefs.getString('businessLogoPath');
-    if (savedLogoPath != null && File(savedLogoPath).existsSync()) {
-      businessLogo.value = File(savedLogoPath);
+    final logoPath = prefs.getString('businessLogoPath');
+    if (logoPath != null && File(logoPath).existsSync()) {
+      businessLogo.value = File(logoPath);
+      print("Business logo loaded from SharedPreferences: $logoPath");
     }
 
-    final savedPhotoPaths = prefs.getStringList('businessPhotoPaths');
-    if (savedPhotoPaths != null) {
-      businessPhotos.assignAll(savedPhotoPaths.where((path) => File(path).existsSync()).map((path) => File(path)).toList());
-    }
-  }
-
-  void loadProfileData({
-    required String businessName,
-    required String regNo,
-    required String gstNo,
-    required String village,
-    required String city,
-    required String state,
-    required String country,
-    required String phone,
-    required String email,
-    required String address,
-    required String description,
-    required String dealerType,
-    required String businessHours,
-    required List<String> paymentMethods,
-    File? businessLogoFile,
-    List<File>? businessPhotosFiles,
-  }) {
-    businessNameController.text = businessName;
-    regNoController.text = regNo;
-    gstNoController.text = gstNo;
-    villageController.text = village;
-    cityController.text = city;
-    stateController.text = state;
-    countryController.text = country;
-    phoneController.text = phone;
-    emailController.text = email;
-    addressController.text = address;
-    descriptionController.text = description;
-
-    selectedDealerType.value = dealerType;
-    selectedPayments.value = paymentMethods;
-    this.businessHours.value = businessHours;
-
-    businessLogo.value = businessLogoFile;
-    if (businessPhotosFiles != null) {
-      businessPhotos.assignAll(businessPhotosFiles);
+    final savedPhotos = prefs.getStringList('businessPhotoPaths');
+    if (savedPhotos != null) {
+      businessPhotos.assignAll(savedPhotos.map((p) => File(p)).where((f) => f.existsSync()).toList());
+      print("Business photos loaded from SharedPreferences: ${businessPhotos.map((f) => f.path).toList()}");
     }
   }
 
@@ -111,16 +115,73 @@ class EditDealerProfileController extends GetxController {
       final pickedFile = await _picker.pickImage(source: source, imageQuality: 70);
       if (pickedFile != null) {
         businessLogo.value = File(pickedFile.path);
-        // Save to prefs immediately
+        print("Picked business logo: ${pickedFile.path}");
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('businessLogoPath', pickedFile.path);
+        print("Business logo path saved in SharedPreferences");
       } else {
         Get.snackbar("Error", "No image selected.", backgroundColor: Colors.red, colorText: Colors.white);
+        print("No image selected for business logo");
       }
     } catch (e) {
       Get.snackbar("Error", "Failed to pick image: $e", backgroundColor: Colors.red, colorText: Colors.white);
+      print("Error picking business logo: $e");
     }
   }
+
+  Future<void> pickBusinessPhoto(ImageSource source) async {
+    try {
+      final pickedFile = await _picker.pickImage(source: source, imageQuality: 70);
+      if (pickedFile != null) {
+        businessPhotos.add(File(pickedFile.path));
+        print("Picked business photo: ${pickedFile.path}");
+        final prefs = await SharedPreferences.getInstance();
+        final photoPaths = businessPhotos.map((file) => file.path).toList();
+        await prefs.setStringList('businessPhotoPaths', photoPaths);
+        print("Business photos paths saved in SharedPreferences: $photoPaths");
+      } else {
+        Get.snackbar("Error", "No image selected.", backgroundColor: Colors.red, colorText: Colors.white);
+        print("No image selected for business photo");
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Failed to pick image: $e", backgroundColor: Colors.red, colorText: Colors.white);
+      print("Error picking business photo: $e");
+    }
+  }
+
+  void removeBusinessPhoto(int index) async {
+    if (index >= 0 && index < businessPhotos.length) {
+      print("Removing business photo at index: $index");
+      businessPhotos.removeAt(index);
+      final prefs = await SharedPreferences.getInstance();
+      final photoPaths = businessPhotos.map((file) => file.path).toList();
+      await prefs.setStringList('businessPhotoPaths', photoPaths);
+      print("Updated business photos paths in SharedPreferences: $photoPaths");
+    }
+  }
+
+  String formatRawTime(String rawTime) {
+    // rawTime example: "15:30" (HH:mm) ya "3:30 PM" already formatted
+    if (rawTime.isEmpty) return "";
+
+    try {
+      // Agar rawTime HH:mm format me hai
+      final parts = rawTime.split(':');
+      if (parts.length == 2) {
+        int hour = int.parse(parts[0]);
+        int minute = int.parse(parts[1]);
+        final period = hour >= 12 ? "PM" : "AM";
+        hour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+        final minStr = minute.toString().padLeft(2, '0');
+        return "$hour:$minStr $period";
+      }
+      return rawTime; // agar already formatted
+    } catch (e) {
+      print("Error formatting time: $e");
+      return rawTime;
+    }
+  }
+
 
   Future<void> pickBusinessHours(BuildContext context) async {
     final TimeOfDay? pickedTime = await showTimePicker(
@@ -129,74 +190,20 @@ class EditDealerProfileController extends GetxController {
     );
 
     if (pickedTime != null) {
-      // Format hour & minute properly
       final hour = pickedTime.hourOfPeriod == 0 ? 12 : pickedTime.hourOfPeriod;
       final minute = pickedTime.minute.toString().padLeft(2, '0');
       final period = pickedTime.period == DayPeriod.am ? "AM" : "PM";
 
       businessHours.value = "$hour:$minute $period";
+      print("Picked business hours: ${businessHours.value}");
 
-      // Save raw format (like 437, 837)
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-          'businessHoursRaw',
-          "${pickedTime.hour}${pickedTime.minute.toString().padLeft(2, '0')}"
-      );
-    }
-  }
-
-  /// Function to format raw string (437 -> 4:37 AM/PM)
-  String formatRawTime(String raw) {
-    if (raw.isEmpty) return "Not set";
-
-    try {
-      // Ensure length (e.g., 437 -> 0437)
-      raw = raw.padLeft(4, '0');
-      final hour = int.parse(raw.substring(0, 2));
-      final minute = int.parse(raw.substring(2));
-
-      final time = TimeOfDay(hour: hour, minute: minute);
-      final h = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
-      final m = time.minute.toString().padLeft(2, '0');
-      final p = time.period == DayPeriod.am ? "AM" : "PM";
-
-      return "$h:$m $p";
-    } catch (e) {
-      return raw; // fallback
-    }
-  }
-
-
-
-  Future<void> pickBusinessPhoto(ImageSource source) async {
-    try {
-      final pickedFile = await _picker.pickImage(source: source, imageQuality: 70);
-      if (pickedFile != null) {
-        businessPhotos.add(File(pickedFile.path));
-        // Save to prefs immediately
-        final prefs = await SharedPreferences.getInstance();
-        final photoPaths = businessPhotos.map((file) => file.path).toList();
-        await prefs.setStringList('businessPhotoPaths', photoPaths);
-      } else {
-        Get.snackbar("Error", "No image selected.", backgroundColor: Colors.red, colorText: Colors.white);
-      }
-    } catch (e) {
-      Get.snackbar("Error", "Failed to pick image: $e", backgroundColor: Colors.red, colorText: Colors.white);
-    }
-  }
-
-  void removeBusinessPhoto(int index) async {
-    if (index >= 0 && index < businessPhotos.length) {
-      businessPhotos.removeAt(index);
-      // Update prefs
-      final prefs = await SharedPreferences.getInstance();
-      final photoPaths = businessPhotos.map((file) => file.path).toList();
-      await prefs.setStringList('businessPhotoPaths', photoPaths);
+      await prefs.setString('businessHoursRaw', "${pickedTime.hour}${pickedTime.minute.toString().padLeft(2, '0')}");
+      print("Business hours saved in SharedPreferences");
     }
   }
 
   void submitDealerProfile() async {
-    // Save all data to SharedPreferences before showing success message
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('businessName', businessNameController.text);
     await prefs.setString('regNo', regNoController.text);
@@ -211,26 +218,14 @@ class EditDealerProfileController extends GetxController {
     await prefs.setString('description', descriptionController.text);
 
     await prefs.setString('selectedDealerType', selectedDealerType.value);
-    await prefs.setStringList('selectedPayments', selectedPayments.toList());
+    await prefs.setStringList('selectedPayments', selectedPayments);
     await prefs.setString('businessHours', businessHours.value);
 
-    Get.snackbar("Success", "Dealer profile updated successfully!",
-        backgroundColor: Colors.green, colorText: Colors.white);
-  }
+    print("Dealer profile saved to SharedPreferences");
+    print("Business logo path: ${businessLogo.value?.path}");
+    print("Business photos paths: ${businessPhotos.map((f) => f.path).toList()}");
 
-  @override
-  void onClose() {
-    businessNameController.dispose();
-    regNoController.dispose();
-    gstNoController.dispose();
-    villageController.dispose();
-    cityController.dispose();
-    stateController.dispose();
-    countryController.dispose();
-    phoneController.dispose();
-    emailController.dispose();
-    addressController.dispose();
-    descriptionController.dispose();
-    super.onClose();
+    Get.snackbar("Success", "Dealer profile updated successfully",
+        backgroundColor: Colors.green, colorText: Colors.white);
   }
 }

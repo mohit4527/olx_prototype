@@ -1,106 +1,117 @@
 import 'package:flutter/material.dart';
-import 'package:olx_prototype/src/constants/app_colors.dart';
-import '../constants/app_sizer.dart';
+import 'package:get/get.dart';
+// app_colors not required in this widget
+
+import '../controller/dealer_wishlist_controller.dart';
+import '../controller/user_wishlist_controller.dart';
 
 class ProductCard extends StatelessWidget {
   final String imagePath;
-  final String price;
   final String roomInfo;
+  final String price;
   final String description;
   final String location;
-  final String date;
+  final DateTime? date;
+  final String productId;
+  final bool isDealer;
 
-  const ProductCard({
+  ProductCard({
     super.key,
     required this.imagePath,
-    required this.price,
     required this.roomInfo,
+    required this.price,
     required this.description,
     required this.location,
-    required this.date,
+    this.date,
+    required this.productId,
+    this.isDealer = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    double cardWidth = MediaQuery.of(context).size.width * 0.55;
+    final userWishlistController = Get.isRegistered<UserWishlistController>()
+        ? Get.find<UserWishlistController>()
+        : Get.put(UserWishlistController());
+    final dealerWishlistController =
+        Get.isRegistered<DealerWishlistController>()
+        ? Get.find<DealerWishlistController>()
+        : Get.put(DealerWishlistController());
 
     return Card(
-      elevation: 5,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(5),
-      ),
-      clipBehavior: Clip.antiAlias,
-      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+      elevation: 4,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image Section
-          AspectRatio(
-            aspectRatio: 1,
-            child: (imagePath != null && imagePath.trim().isNotEmpty)
-                ? (imagePath.startsWith("http")
-                ? Image.network(
-              imagePath,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Image.asset(
-                  "assets/images/placeholder.jpg",
-                  fit: BoxFit.cover,
-                );
-              },
-            )
-                : Image.asset(
-              imagePath,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Image.asset(
-                  "assets/images/placeholder.jpg",
-                  fit: BoxFit.cover,
-                );
-              },
-            ))
-                : Image.asset(
-              "assets/images/placeholder.jpg",
-              fit: BoxFit.cover,
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(5),
+                    ),
+                    child: Image.network(
+                      imagePath,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          Image.asset("assets/images/placeholder.jpg"),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Obx(() {
+                    final isInWishlist = isDealer
+                        ? dealerWishlistController.isInWishlist(productId)
+                        : userWishlistController.isInWishlist(productId);
+
+                    return GestureDetector(
+                      onTap: () {
+                        if (isDealer) {
+                          dealerWishlistController.toggleWishlist(productId);
+                        } else {
+                          userWishlistController.toggleWishlist(productId);
+                        }
+                      },
+                      child: CircleAvatar(
+                        backgroundColor: Colors.grey.withOpacity(0.6),
+                        child: Icon(
+                          isInWishlist ? Icons.favorite : Icons.favorite_border,
+                          color: isInWishlist ? Colors.red : Colors.black54,
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
             ),
           ),
-
-
-          // Details Section
-          SizedBox(height: AppSizer().height1,),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.all(8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  price,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: AppSizer().fontSize16,
-                  ),
+                  roomInfo,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        location,
-                        style: TextStyle(
-                          fontSize: AppSizer().fontSize14,
-                          color: AppColors.appGrey,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Text(
-                      date,
-                      style: TextStyle(
-                        fontSize: AppSizer().fontSize14,
-                        color: AppColors.appGrey,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  price,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
                 ),
               ],
             ),

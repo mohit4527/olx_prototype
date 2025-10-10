@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:olx_prototype/src/constants/app_colors.dart';
+import 'package:video_player/video_player.dart';
 import 'package:olx_prototype/src/utils/app_routes.dart';
+import 'package:olx_prototype/src/controller/token_controller.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -10,28 +11,46 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+class _SplashScreenState extends State<SplashScreen> {
+  late VideoPlayerController _controller;
 
   @override
   void initState() {
     super.initState();
 
-    _controller = AnimationController(
-      duration: const Duration(seconds: 1),
-      vsync: this,
-    );
+    _controller = VideoPlayerController.asset('assets/videos/splash_video.mp4')
+      ..initialize().then((_) {
+        setState(() {});
+        _controller.play();
+      });
+    // Start asynchronous startup sequence: ensure token is loaded and
+    // navigate to Home if user is logged in, otherwise to Login.
+    _start();
+  }
 
-    _controller.forward();
+  Future<void> _start() async {
+    try {
+      final TokenController tokenController = Get.find<TokenController>();
 
-    // Jab animation complete ho jaye, 0.5s ke baad login page pe jao
-    _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          Get.offAllNamed(AppRoutes.login);
-        });
+      // Ensure token is loaded from shared preferences (safe to call even if already loaded)
+      await tokenController.loadTokenFromStorage();
+
+      // Keep splash visible for at least 3 seconds (video may be shorter/longer)
+      await Future.delayed(const Duration(seconds: 3));
+
+      if (!mounted) return;
+
+      if (tokenController.isLoggedIn) {
+        print("🔒 Found logged-in state - navigating to Home");
+        Get.offAllNamed(AppRoutes.home);
+      } else {
+        print("🔓 No logged-in state - navigating to Login");
+        Get.offAllNamed(AppRoutes.login);
       }
-    });
+    } catch (e) {
+      print("⚠️ Splash startup error: $e");
+      if (mounted) Get.offAllNamed(AppRoutes.login);
+    }
   }
 
   @override
@@ -43,16 +62,18 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.fullAppColor,
-      body: Center(
-        child: RotationTransition(
-          turns: Tween(begin: 0.0, end: 1.0).animate(_controller),
-          child: Image.asset(
-            "assets/images/applogo.jpg",
-            height: 200,
+      body: _controller.value.isInitialized
+          ? SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: _controller.value.size.width,
+            height: _controller.value.size.height,
+            child: VideoPlayer(_controller),
           ),
         ),
-      ),
+      )
+          : const Center(child: CircularProgressIndicator()),
     );
   }
 }

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
+import 'package:olx_prototype/src/services/apiServices/apiServices.dart';
+import 'package:path/path.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/app_routes.dart';
@@ -50,6 +52,8 @@ class DealerProfileController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    // Jab app shuru ho, to check karo ki profile already bani hai ya nahi.
+    checkIfProfileExists();
     loadSavedData();
   }
 
@@ -157,51 +161,97 @@ class DealerProfileController extends GetxController {
   }
 
   /// ---------------- FORM SUBMISSION ----------------
-  Future<void> submitForm() async {
+  Future<void> submitForm(BuildContext context) async {
     if (!validateForm()) return;
 
     isLoading.value = true;
     try {
-      final formattedStart = startTime.value!.format(Get.context!).replaceAll(' ', '').toUpperCase();
-      final formattedEnd = endTime.value!.format(Get.context!).replaceAll(' ', '').toUpperCase();
-      String businessHours = "${formattedStart.replaceAll(':', '')}-${formattedEnd.replaceAll(':', '')}";
+      final formattedStart = startTime.value!.format(context);
+      final formattedEnd = endTime.value!.format(context);
+      String businessHours = "$formattedStart - $formattedEnd";
 
-      await saveProfileDataToSharedPreferences(businessHours);
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString("userId") ?? "";
 
-      // Simulated Success
-      isProfileCreated.value = true;
-      Get.snackbar("Success", "Dealer Profile Created Successfully!",
-          backgroundColor: Colors.green, colorText: Colors.white);
+      if (userId.isEmpty) {
+        Get.snackbar("Error", "User not logged in. Please login again.",
+            backgroundColor: Colors.red, colorText: Colors.white);
+        isLoading.value = false;
+        return;
+      }
 
-      // Send Data to Edit Controller
-      final editController = Get.find<EditDealerProfileController>();
-      editController.loadProfileData(
+      String dealerType = selectedDealerType.value.toLowerCase();
+      List<String> normalizedPayments =
+      selectedPayments.map((p) => p.toLowerCase()).toList();
+
+      final result = await ApiService.registerDealer(
+        userId: userId,
         businessName: businessNameController.text,
-        regNo: regNoController.text,
-        gstNo: gstNoController.text,
+        registrationNumber: regNoController.text,
+        gstNumber: gstNoController.text,
         village: villageController.text,
         city: cityController.text,
         state: stateController.text,
         country: countryController.text,
         phone: phoneController.text,
         email: emailController.text,
-        address: addressController.text,
+        businessAddress: addressController.text,
+        dealerType: dealerType,
         description: descriptionController.text,
-        dealerType: selectedDealerType.value,
         businessHours: businessHours,
-        paymentMethods: selectedPayments,
-        businessLogoFile: businessLogo.value,
-        businessPhotosFiles: businessPhotos,
+        paymentMethods: normalizedPayments,
+        businessLogo: businessLogo.value!,
+        businessPhotos: businessPhotos,
       );
 
-      Get.offAllNamed(AppRoutes.home);
+      if (result != null && result["status"] == true) {
+        isProfileCreated.value = true;
+
+        if (result["data"] != null && result["data"]["_id"] != null) {
+          await saveDealerId(result["data"]["_id"]);
+        }
+
+        await prefs.setBool('isProfileCreated', true);
+        await saveProfileDataToSharedPreferences(businessHours);
+
+        Get.snackbar("Success", "Dealer Profile Created Successfully!",
+            backgroundColor: Colors.green, colorText: Colors.white);
+
+        final Map<String, dynamic> dealerData = {
+          'businessName': businessNameController.text,
+          'regNo': regNoController.text,
+          'gstNo': gstNoController.text,
+          'village': villageController.text,
+          'city': cityController.text,
+          'state': stateController.text,
+          'country': countryController.text,
+          'phone': phoneController.text,
+          'email': emailController.text,
+          'address': addressController.text,
+          'description': descriptionController.text,
+          'selectedDealerType': selectedDealerType.value,
+          'selectedPayments': selectedPayments.toList(),
+          'businessHours': businessHours,
+          'businessLogoPath': businessLogo.value?.path,
+          'businessPhotoPaths': businessPhotos.map((f) => f.path).toList(),
+        };
+
+        Get.offAllNamed(AppRoutes.edit_dealer_profile, arguments: dealerData);
+      } else {
+        Get.snackbar("Error",
+            "Failed to create dealer profile: ${result?["error"] ?? "Unknown error"}",
+            backgroundColor: Colors.red, colorText: Colors.white);
+      }
     } catch (e) {
-      Get.snackbar("Error", "Failed to connect to server: $e",
+      Get.snackbar("Error", "Something went wrong: $e",
           backgroundColor: Colors.red, colorText: Colors.white);
     } finally {
       isLoading.value = false;
     }
   }
+
+
+
 
   /// ---------------- SHARED PREFERENCES ----------------
   Future<void> saveProfileDataToSharedPreferences(String businessHours) async {
@@ -264,6 +314,22 @@ class DealerProfileController extends GetxController {
           .map((path) => File(path))
           .toList());
     }
+  }
+
+  /// ---------------- NAYA FUNCTION ----------------
+  Future<void> checkIfProfileExists() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool? isCreated = prefs.getBool('isProfileCreated');
+    if (isCreated != null && isCreated) {
+      isProfileCreated.value = true;
+    }
+  }
+
+  /// ---------------- SAVE DEALER ID ----------------
+  Future<void> saveDealerId(String dealerId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('dealerId', dealerId);
+    print("DealerId stored in SharedPreferences: $dealerId");
   }
 
   /// ---------------- INPUT FORMATTERS ----------------

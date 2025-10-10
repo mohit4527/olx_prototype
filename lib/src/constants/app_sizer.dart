@@ -77,6 +77,7 @@ class AppSizer {
   final double width10 = 10.w;
   final double width12 = 12.w;
   final double width14 = 14.w;
+  final double width15 = 15.w;
   final double width16 = 16.w;
   final double width18 = 18.w;
   final double width20 = 20.w;

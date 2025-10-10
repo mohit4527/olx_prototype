@@ -15,75 +15,96 @@ class SettingScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.appGreen,
-        title: Text("Settings",style:TextStyle(color: AppColors.appWhite),),
+        title: Text("Settings", style: TextStyle(color: AppColors.appWhite)),
         centerTitle: true,
-        leading: IconButton(onPressed: (){
-          Get.back();
-        }
-           , icon: Icon(Icons.arrow_back,color: AppColors.appWhite,)),
+        leading: IconButton(
+          onPressed: () => Get.back(),
+          icon: Icon(Icons.arrow_back, color: AppColors.appWhite),
+        ),
       ),
       body: Container(
-      height: AppSizer().height100,
-    decoration: BoxDecoration(
-    gradient: LinearGradient(
-    colors: AppColors.appGradient,
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    ),
-    ),
-    child:ListView(
-        children: [
-          ListTile(
-            leading: Icon(Icons.dark_mode,),
-            title: Text("Dark Mode"),
-            trailing: Obx(() => Switch(
-              value: _themeController.themeMode.value == ThemeMode.dark,
-              onChanged: (value) {
-                _themeController.toggleTheme(value);
+        height: AppSizer().height100,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: AppColors.appGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: ListView(
+          children: [
+            ListTile(
+              leading: Icon(Icons.dark_mode),
+              title: Text("Dark Mode"),
+              trailing: Obx(
+                () => Switch(
+                  value: _themeController.themeMode.value == ThemeMode.dark,
+                  onChanged: (value) {
+                    _themeController.toggleTheme(value);
+                  },
+                ),
+              ),
+            ),
+            Divider(color: AppColors.appGreen, thickness: 2),
+            ListTile(
+              leading: Icon(
+                Icons.notifications,
+                color: AppColors.appGrey.shade800,
+              ),
+              title: Text("Notifications"),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: AppColors.appGrey.shade600,
+              ),
+              onTap: () {
+                Get.toNamed(AppRoutes.notifications);
               },
-            )),
-          ),
-          Divider(color: AppColors.appGreen,thickness: 2,),
-          ListTile(
-            leading: Icon(Icons.notifications,color: AppColors.appGrey.shade800,),
-            title: Text("Notifications"),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16,color: AppColors.appGrey.shade600,),
-            onTap: () {
-              Get.toNamed(AppRoutes.notifications,);
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.remove_red_eye,color: AppColors.appGrey.shade800,),
-            title: Text("Appearance"),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16,color: AppColors.appGrey.shade600,),
-            onTap: () {},
-          ),
-          ListTile(
-            leading: Icon(Icons.lock,color: AppColors.appGrey.shade800,),
-            title: Text("Privacy & Security"),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16,color: AppColors.appGrey.shade600,),
-            onTap: () {
-              Get.toNamed(AppRoutes.privacy_screen);
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.support_agent,color: AppColors.appGrey.shade800,),
-            title: Text("Help and Support"),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16,color: AppColors.appGrey.shade600,),
-            onTap: () {
-              Get.toNamed(AppRoutes.help_support);
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.info_outline,color: AppColors.appGrey.shade800,),
-            title: Text("About"),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16,color: AppColors.appGrey.shade600,),
-            onTap: () {
-              Get.toNamed(AppRoutes.about);
-            },
-          ),
-        ],
-      ),
+            ),
+            ListTile(
+              leading: Icon(Icons.lock, color: AppColors.appGrey.shade800),
+              title: Text("Privacy Policy"),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: AppColors.appGrey.shade600,
+              ),
+              onTap: () {
+                Get.toNamed(AppRoutes.privacy_screen);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.support_agent,
+                color: AppColors.appGrey.shade800,
+              ),
+              title: Text("Customer Support"),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: AppColors.appGrey.shade600,
+              ),
+              onTap: () {
+                Get.toNamed(AppRoutes.help_support);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.info_outline,
+                color: AppColors.appGrey.shade800,
+              ),
+              title: Text("About"),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: AppColors.appGrey.shade600,
+              ),
+              onTap: () {
+                Get.toNamed(AppRoutes.about);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "893683420686",
-    "project_id": "old-market-87ecd",
-    "storage_bucket": "old-market-87ecd.firebasestorage.app"
+    "project_number": "690084906950",
+    "project_id": "oldmarket-4b207",
+    "storage_bucket": "oldmarket-4b207.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:893683420686:android:6f755e3dce5ecb0a06365f",
+        "mobilesdk_app_id": "1:690084906950:android:4d56f004b985574c0a54c7",
         "android_client_info": {
           "package_name": "com.example.olx_prototype"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "690084906950-i262c9n1buni8kth2bgfaskjlfjfptp1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.olx_prototype",
+            "certificate_hash": "22aa7259c1b11133b662dea0f853597f5ed92e6f"
+          }
+        },
+        {
+          "client_id": "690084906950-neb2vn6e7p3ervkcdq79ufsqm2qma9eu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyAZ5rQ1qWt7SGio2kjJ0p3IvtsWtuYHOTk"
+          "current_key": "AIzaSyCjBWwToMxxwna-j1fLj_OTdVzkV3m7YCM"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "690084906950-neb2vn6e7p3ervkcdq79ufsqm2qma9eu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

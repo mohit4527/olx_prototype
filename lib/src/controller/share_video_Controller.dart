@@ -1,35 +1,66 @@
-// ==================== share_video_controller.dart ====================
 import 'package:get/get.dart';
-import '../model/share_video_model/share_video_model.dart';
-import '../services/apiServices/apiServices.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ShareVideoController extends GetxController {
-  var isSharing = false.obs;
-  var sharedVideos = <SharedVideo>[].obs;
 
-  Future<SharedVideo> shareVideo(String videoId, String userId, String token) async {
-    try {
-      isSharing.value = true;
-      final response = await ApiService.shareVideo(
-        videoId: videoId,
-        userId: userId,
-        token: token,
-      );
-      return response;
-    } catch (e) {
-      rethrow;
-    } finally {
-      isSharing.value = false;
+  static const String _assetBase = "http://oldmarket.bhoomi.cloud/";
+
+  String getFullVideoUrl(String? path) {
+    if (path == null || path.isEmpty) return _assetBase;
+    final fixed = path.replaceAll("\\", "/");
+    if (fixed.startsWith("http")) return fixed;
+    final base = _assetBase.endsWith("/") ? _assetBase : "${_assetBase}/";
+    final rel  = fixed.startsWith("/") ? fixed.substring(1) : fixed;
+    return "$base$rel";
+  }
+
+  Future<void> _launchOrShare(String url, String fallbackShare) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      await Share.share(fallbackShare);
     }
   }
 
-  // ✅ Get all shared videos
-  Future<void> fetchSharedVideos(String token) async {
-    try {
-      final videos = await ApiService.getSharedVideos(token);
-      sharedVideos.assignAll(videos);
-    } catch (e) {
-      rethrow;
-    }
+  /// WhatsApp
+  Future<void> shareToWhatsApp(String videoPathOrUrl) async {
+    final full = getFullVideoUrl(videoPathOrUrl);
+    final url  = "https://wa.me/?text=${Uri.encodeComponent(full)}";
+    await _launchOrShare(url, full);
+  }
+
+  /// Facebook
+  Future<void> shareToFacebook(String videoPathOrUrl) async {
+    final full = getFullVideoUrl(videoPathOrUrl);
+    final url  = "https://www.facebook.com/sharer/sharer.php?u=${Uri.encodeComponent(full)}";
+    await _launchOrShare(url, full);
+  }
+
+  /// Telegram
+  Future<void> shareToTelegram(String videoPathOrUrl) async {
+    final full = getFullVideoUrl(videoPathOrUrl);
+    final url  = "https://t.me/share/url?url=${Uri.encodeComponent(full)}";
+    await _launchOrShare(url, full);
+  }
+
+  /// SMS
+  Future<void> shareToSMS(String videoPathOrUrl) async {
+    final full = getFullVideoUrl(videoPathOrUrl);
+    final url  = "sms:?body=${Uri.encodeComponent(full)}";
+    await _launchOrShare(url, full);
+  }
+
+  /// Instagram (no direct deep link for URLs) -> generic share
+  Future<void> shareToInstagram(String videoPathOrUrl) async {
+    final full = getFullVideoUrl(videoPathOrUrl);
+    await Share.share(full);
+  }
+
+  /// Others
+  Future<void> shareOthers(String videoPathOrUrl) async {
+    final full = getFullVideoUrl(videoPathOrUrl);
+    await Share.share(full);
   }
 }

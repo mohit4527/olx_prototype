@@ -61,14 +61,14 @@ List<Product> productList = [
 class CustomProductCard extends StatelessWidget {
   final String title;
   final String subtitle;
-  final String imageUrl;
+  final String? imageUrl;
   final VoidCallback? onTap;
 
   const CustomProductCard({
     Key? key,
     required this.title,
     required this.subtitle,
-    required this.imageUrl,
+    this.imageUrl,
     this.onTap,
   }) : super(key: key);
 
@@ -86,14 +86,14 @@ class CustomProductCard extends StatelessWidget {
           children: [
             // Title
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              padding:EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               child: Text(
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style:  TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: AppSizer().fontSize17,
+                  fontSize: AppSizer().fontSize18,
                 ),
               ),
             ),
@@ -102,12 +102,20 @@ class CustomProductCard extends StatelessWidget {
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(5),
-                child: Image.asset(
-                  imageUrl,
+                child: imageUrl != null && imageUrl!.isNotEmpty
+                    ? Image.network(
+                  imageUrl!.replaceAll('\\', '/').trim(),
                   fit: BoxFit.cover,
                   width: double.infinity,
                   errorBuilder: (context, error, stackTrace) =>
-                  const Icon(Icons.image, size: 50, color: Colors.grey),
+                      Image.asset(
+                        "assets/images/placeholder.jpg",
+                        fit: BoxFit.cover,
+                      ),
+                )
+                    : Image.asset(
+                  "assets/images/placeholder.jpg",
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
@@ -119,9 +127,10 @@ class CustomProductCard extends StatelessWidget {
                 subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style:  TextStyle(
+                style: TextStyle(
                   fontSize: AppSizer().fontSize16,
-                  color: AppColors.appGrey.shade700,
+                  color: AppColors.appGrey.shade800,
+                  fontWeight: FontWeight.bold
                 ),
               ),
             ),
@@ -131,4 +140,3 @@ class CustomProductCard extends StatelessWidget {
     );
   }
 }
-

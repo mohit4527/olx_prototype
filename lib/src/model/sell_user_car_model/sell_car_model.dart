@@ -5,12 +5,14 @@ class SellUserCarModel {
   final String type;
   final String userId;
   final Location location;
+  final String category;
   final String? dealerType;
 
   SellUserCarModel({
     required this.title,
     required this.description,
     required this.price,
+    required this.category,
     required this.type,
     required this.userId,
     required this.location,

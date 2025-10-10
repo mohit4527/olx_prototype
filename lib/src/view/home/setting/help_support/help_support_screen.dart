@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
-import 'package:olx_prototype/src/utils/app_routes.dart';
-
-import '../../../../custom_widgets/setting_screen_helper.dart';
 
 class HelpSupportScreen extends StatelessWidget {
-  const HelpSupportScreen({super.key});
+  HelpSupportScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.appGreen,
@@ -19,115 +17,159 @@ class HelpSupportScreen extends StatelessWidget {
         centerTitle: true,
         iconTheme: IconThemeData(color: AppColors.appWhite),
         title: Text(
-          "Help & Support",
+          "Customer Support",
           style: TextStyle(
             color: AppColors.appWhite,
             fontSize: AppSizer().fontSize18,
             fontWeight: FontWeight.w600,
           ),
         ),
-        leading: IconButton(onPressed: (){
-          Get.back();
-        },
-            icon:Icon(Icons.arrow_back,color: AppColors.appWhite,)),
-      ),
-      body: Container(
-      height: AppSizer().height100,
-    decoration: BoxDecoration(
-    gradient: LinearGradient(
-    colors: AppColors.appGradient,
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    ),
-    ),
-      child:
-      Padding(
-        padding: EdgeInsets.all(AppSizer().height1),
-        child: ListView(
-          children: [
-            _helpTile(
-              icon: Icons.question_answer_outlined,
-              title: "FAQs",
-              subtitle: "Find answers to common questions.",
-              onTap: () {
-                // Navigate to FAQ screen
-              },
-            ),
-            _helpTile(
-              icon: Icons.support_agent_outlined,
-              title: "Contact Support",
-              subtitle: "Get help from our support team.",
-              onTap: () {
-                // Navigate to chat or support form
-              },
-            ),
-            _helpTile(
-              icon: Icons.bug_report_outlined,
-              title: "Report a Problem",
-              subtitle: "Tell us if something isn't working.",
-              onTap: () {
-                FeedbackDialog.showReportDialog(context);
-              },
-            ),
-            _helpTile(
-              icon: Icons.star_border_outlined,
-              title: "Rate this App",
-              subtitle: "Share Your experience on this app",
-              onTap: () {
-                FeedbackDialog.showRatingDialog(context);
-              },
-            ),
-            _helpTile(
-              icon: Icons.feedback_outlined,
-              title: "Give Feedback",
-              subtitle: "Share your thoughts to improve the app.",
-              onTap: () {
-                FeedbackDialog.showFeedbackDialog(context);
-              },
-            ),
-            _helpTile(
-              icon: Icons.privacy_tip_outlined,
-              title: "Privacy Policy",
-              subtitle: "Read how we handle your data.",
-              onTap: () {
-                Get.toNamed(AppRoutes.privacy_screen);
-                },
-            ),
-          ],
+        leading: IconButton(
+          onPressed: () {
+            Get.back();
+          },
+          icon: Icon(Icons.arrow_back, color: AppColors.appWhite),
         ),
       ),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: isDark
+              ? LinearGradient(
+            colors: [Colors.black, Colors.grey.shade900],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )
+              : LinearGradient(
+            colors: [AppColors.appGreen.withOpacity(0.2), Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(AppSizer().height2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              SizedBox(height: AppSizer().height2),
+
+              _buildSectionTitle("Need Help?",),
+              _buildSectionContent(
+                "Our team is always here to support you. "
+                    "If you face any issues with buying, selling, or using the Old Market app, feel free to reach out to us.",
+              ),
+
+              _buildSectionTitle("Contact Us"),
+              _buildContactRow(
+                icon: Icons.email_outlined,
+                label: "Email",
+                value: "support@oldmarket.com",
+              ),
+              _buildContactRow(
+                icon: Icons.phone_android,
+                label: "Phone",
+                value: "+91-9876543210",
+              ),
+
+              _buildSectionTitle("Support Hours"),
+              _buildSectionContent(
+                "📅 Monday - Saturday\n⏰ 9:00 AM - 7:00 PM\n\n"
+                    "We aim to respond to all queries within 24 hours.",
+              ),
+
+              _buildSectionTitle("Feedback"),
+              _buildSectionContent(
+                "Your feedback helps us improve! "
+                    "If you have suggestions about how we can make Old Market better, "
+                    "don’t hesitate to share them with our team.",
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _helpTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      contentPadding: EdgeInsets.symmetric(vertical: AppSizer().height1),
-      leading: CircleAvatar(
-        backgroundColor: AppColors.appBlack.withOpacity(0.6),
-        child: Icon(icon, color: AppColors.appWhite),
+  Widget _buildHeader() {
+    return Center(
+      child: Column(
+        children: [
+          Icon(
+            Icons.support_agent,
+            size: AppSizer().height8,
+            color: AppColors.appGreen,
+          ),
+          SizedBox(height: AppSizer().height1),
+          Text(
+            "We're Here to Help!",
+            style: TextStyle(
+              fontSize: AppSizer().fontSize19,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+        ],
       ),
-      title: Text(
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: EdgeInsets.only(top: AppSizer().height2, bottom: AppSizer().height1),
+      child: Text(
         title,
         style: TextStyle(
-          fontSize: AppSizer().fontSize16,
+          fontSize: AppSizer().fontSize17,
           fontWeight: FontWeight.w600,
-          color: AppColors.appGrey.shade900,
+          color: AppColors.appGreen,
         ),
       ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: AppSizer().fontSize14,
-          color:AppColors.appGrey.shade700,
-        ),
+    );
+  }
+
+  Widget _buildSectionContent(String content) {
+    return Text(
+      content,
+      style: TextStyle(
+        fontSize: AppSizer().fontSize16,
+        color: Colors.black87,
+        height: 1.5,
       ),
-      onTap: onTap,
+    );
+  }
+
+  Widget _buildContactRow({required IconData icon, required String label, required String value}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: AppSizer().height1),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.appGreen, size: AppSizer().height3),
+          SizedBox(width: AppSizer().width3),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: AppSizer().fontSize16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black54,
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: AppSizer().fontSize16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

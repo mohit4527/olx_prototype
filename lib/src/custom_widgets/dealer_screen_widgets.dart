@@ -100,12 +100,20 @@ class AppCustomWidgets {
   }
 
   ///------- Chip ------
-  static Widget buildChip(String label, {bool isSelected = false}) {
+  static Widget buildChip(
+      String label, {
+        bool isSelected = false,
+        required BuildContext context,
+      }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       height: AppSizer().height5,
       width: AppSizer().width30,
       decoration: BoxDecoration(
-        color: isSelected ? AppColors.appGreen : AppColors.appWhite,
+        color: isSelected
+            ? AppColors.appGreen
+            : (isDark ? Colors.grey[850] : AppColors.appWhite),
         borderRadius: BorderRadius.circular(AppSizer().height3),
         border: Border.all(color: AppColors.appGrey.shade700),
       ),
@@ -113,14 +121,15 @@ class AppCustomWidgets {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black,
+            color: isSelected
+                ? Colors.white
+                : (isDark ? Colors.white : Colors.black),
             fontSize: AppSizer().fontSize15,
           ),
         ),
       ),
     );
   }
-
   /// -------- Image Upload Box --------
   static Widget buildImageUploadBox() {
     return Container(

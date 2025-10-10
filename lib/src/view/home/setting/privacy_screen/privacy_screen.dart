@@ -1,131 +1,122 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
-import 'package:path/path.dart';
 
 class PrivacyScreen extends StatelessWidget {
-  const PrivacyScreen({super.key});
+  PrivacyScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.appGreen,
         elevation: 0.5,
         centerTitle: true,
-        iconTheme: IconThemeData(color: AppColors.appBlack),
+        iconTheme: IconThemeData(color: AppColors.appWhite),
         title: Text(
-          "Privacy & Security",
+          "Privacy Policy",
           style: TextStyle(
             color: AppColors.appWhite,
             fontSize: AppSizer().fontSize18,
             fontWeight: FontWeight.w600,
           ),
         ),
-        leading: IconButton(onPressed: (){
-          Get.back();
-        }, icon:
-        Icon(Icons.arrow_back,color: AppColors.appWhite,)
+        leading: IconButton(
+          onPressed: () {
+            Get.back();
+          },
+          icon: Icon(Icons.arrow_back, color: AppColors.appWhite),
         ),
       ),
-      body:Container(
-      height: AppSizer().height100,
-    decoration: BoxDecoration(
-    gradient: LinearGradient(
-    colors: AppColors.appGradient,
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    ),
-    ),
-      child:
-      Padding(
-        padding: EdgeInsets.all(AppSizer().height1),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionTitle("Your Data",),
-            _settingTile(
-              icon: Icons.lock_outline,
-              title: "Password & Login",
-              subtitle: "Change your password or manage login options.",
-              onTap: () {},
-            ),
-            _settingTile(
-              icon: Icons.security,
-              title: "Two-Factor Authentication",
-              subtitle: "Add an extra layer of security to your account.",
-              onTap: () {},
-            ),
-            _settingTile(
-              icon: Icons.privacy_tip_outlined,
-              title: "Privacy Policy",
-              subtitle: "Review how we collect and handle your data.",
-              onTap: () {},
-            ),
-            SizedBox(height: AppSizer().height2),
-            _sectionTitle("Permissions"),
-            _settingTile(
-              icon: Icons.notifications_active_outlined,
-              title: "Notification Access",
-              subtitle: "Manage app notification settings.",
-              onTap: () {},
-            ),
-            _settingTile(
-              icon: Icons.location_on_outlined,
-              title: "Location Access",
-              subtitle: "Manage app location permissions.",
-              onTap: () {},
-            ),
-          ],
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: isDark
+              ? LinearGradient(
+            colors: [Colors.black, Colors.grey.shade900],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )
+              : LinearGradient(
+            colors: [AppColors.appGreen.withOpacity(0.2), Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(AppSizer().height2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle("Introduction"),
+              _buildSectionContent(
+                  "Welcome to Old Market. Your privacy is very important to us. This Privacy Policy explains how we collect, use, and safeguard your personal information when you use our app and services."),
+
+              _buildSectionTitle("Information We Collect"),
+              _buildSectionContent(
+                  "1. Personal Information: Name, phone number, email address, and account details provided during registration.\n\n"
+                      "2. Usage Data: Information on how you use Old Market, including recently viewed items, searches, and clicks.\n\n"
+                      "3. Device Data: Device model, operating system, and app version."),
+
+              _buildSectionTitle("How We Use Your Information"),
+              _buildSectionContent(
+                  "• To provide and improve our marketplace services.\n"
+                      "• To personalize your user experience, including showing relevant products.\n"
+                      "• To communicate with you about offers, updates, and support.\n"
+                      "• To ensure secure transactions and prevent fraud."),
+
+              _buildSectionTitle("Data Sharing & Security"),
+              _buildSectionContent(
+                  "We do not sell or rent your personal data. Information may only be shared with trusted partners (like payment gateways) to complete your transactions. All personal data is protected using secure encryption and strict access controls."),
+
+              _buildSectionTitle("Your Rights"),
+              _buildSectionContent(
+                  "• You can access, update, or delete your personal data at any time from account settings.\n"
+                      "• You may opt-out of promotional notifications through app settings.\n"
+                      "• You have the right to request complete account deletion."),
+
+              _buildSectionTitle("Changes to This Policy"),
+              _buildSectionContent(
+                  "Old Market may update this Privacy Policy from time to time. We encourage you to review this page periodically for the latest updates."),
+
+              _buildSectionTitle("Contact Us"),
+              _buildSectionContent(
+                  "If you have any questions or concerns about this Privacy Policy, please contact us at:\n\n"
+                      "📧 support@oldmarket.com\n"
+                      "📞 +91-XXXXXXXXXX"),
+            ],
+          ),
         ),
       ),
-      )
     );
   }
 
-  Widget _sectionTitle(String title) {
+  Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: AppSizer().height1),
+      padding: EdgeInsets.only(top: AppSizer().height2, bottom: AppSizer().height1),
       child: Text(
         title,
         style: TextStyle(
-          fontSize: AppSizer().fontSize16,
+          fontSize: AppSizer().fontSize18,
           fontWeight: FontWeight.bold,
-          color: AppColors.appBlack,
+          color: AppColors.appGreen,
         ),
       ),
     );
   }
 
-  Widget _settingTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      contentPadding: EdgeInsets.symmetric(vertical: 4),
-      leading: CircleAvatar(
-        backgroundColor: AppColors.appBlack.withOpacity(0.4),
-        child: Icon(icon, color: AppColors.appWhite),
+  Widget _buildSectionContent(String content) {
+    return Text(
+      content,
+      style: TextStyle(
+        fontSize: AppSizer().fontSize16,
+        color: Colors.black87,
+        height: 1.5,
       ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: AppSizer().fontSize16,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: AppSizer().fontSize14,
-          color: AppColors.appGrey.shade700,
-        ),
-      ),
-      onTap: onTap,
     );
   }
 }

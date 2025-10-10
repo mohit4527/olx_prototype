@@ -1,354 +1,383 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
-import 'package:olx_prototype/src/controller/short_video_controller.dart';
-import '../../../controller/share_video_Controller.dart';
-import '../../../controller/token_controller.dart';
-import '../../../custom_widgets/comment_box.dart';
+import '../../../controller/short_video_controller.dart';
+import '../../../custom_widgets/share_video_bottomsheet.dart';
 import '../../../custom_widgets/shortVideoWidget.dart';
-import '../../../services/auth_service/auth_service.dart';
-import '../../../utils/app_routes.dart';
-import '../description/description_screen.dart';
+import '../../../model/short_video_model/short_video_model.dart';
+import '../video_uploadScreen/video_uploadScreen.dart';
+import '../../../services/apiServices/apiServices.dart';
 
-class ShortvideoScreen extends StatelessWidget {
-  final shareVideoController = Get.put(ShareVideoController());
-  final ShortVideoController videoController = Get.put(ShortVideoController(), permanent: true);
+class ShortVideoScreen extends StatefulWidget {
+  ShortVideoScreen({Key? key}) : super(key: key);
 
-  ShortvideoScreen({super.key});
+  @override
+  State<ShortVideoScreen> createState() => _ShortVideoScreenState();
+}
+
+class _ShortVideoScreenState extends State<ShortVideoScreen> {
+  final ShortVideoController controller = Get.put(ShortVideoController());
+  late PageController _pageCtrl;
+  int _initialPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Determine if an initial video id was passed
+    final arg = Get.arguments;
+    print('[ShortVideoScreen] initState: raw Get.arguments => $arg');
+    bool didJump = false;
+    if (arg != null) {
+      try {
+        String? vid;
+        List<dynamic>? inlineVideos;
+        int? inlineIndex;
+
+        if (arg is String) {
+          vid = arg;
+        } else if (arg is Map) {
+          // Accept either an id or a supplied videos list + currentIndex
+          vid =
+              arg['id']?.toString() ??
+              arg['videoId']?.toString() ??
+              arg['video']?.toString();
+          if (arg['videos'] != null && arg['currentIndex'] != null) {
+            inlineVideos = arg['videos'] as List<dynamic>?;
+            inlineIndex = (arg['currentIndex'] is int)
+                ? arg['currentIndex'] as int
+                : int.tryParse(arg['currentIndex'].toString()) ?? 0;
+          }
+        } else {
+          vid = arg.toString();
+        }
+        final vidsForLog = inlineVideos != null
+            ? 'provided inline videos(${inlineVideos.length})'
+            : 'no inline videos';
+        print(
+          '[ShortVideoScreen] interpreted initial vid => $vid, $vidsForLog',
+        );
+        print('[ShortVideoScreen] interpreted initial vid => $vid');
+        if (inlineVideos != null && inlineIndex != null) {
+          try {
+            // If caller provided a full videos list and index, use it to populate controller.videos for immediate navigation.
+            final parsed = inlineVideos.map((e) {
+              if (e is Map<String, dynamic>) return VideoModel.fromJson(e);
+              return e as VideoModel;
+            }).toList();
+            controller.videos.assignAll(parsed);
+            _initialPage = inlineIndex.clamp(0, parsed.length - 1);
+            didJump = true;
+            print(
+              '[ShortVideoScreen] used inline videos, initialPage=$_initialPage',
+            );
+          } catch (e) {
+            print('[ShortVideoScreen] failed to use inline videos: $e');
+          }
+        }
+
+        if (vid != null) {
+          // If videos are already loaded, jump immediately
+          final existingIndex = controller.videos.indexWhere(
+            (v) => v.id == vid,
+          );
+          if (existingIndex >= 0) {
+            _initialPage = existingIndex;
+            print('[ShortVideoScreen] found existingIndex => $existingIndex');
+            didJump = true;
+          }
+
+          // find index after videos load; use GetX `ever` so we reliably
+          // react when the RxList updates (works even if videos load later).
+          if (!didJump) {
+            ever(controller.videos, (list) {
+              try {
+                if (didJump) return;
+                final items = (list as List); // GetX provides a non-null list
+                final index = items.indexWhere((v) {
+                  try {
+                    final id = (v as dynamic).id ?? '';
+                    return id == vid;
+                  } catch (_) {
+                    return false;
+                  }
+                });
+                if (index >= 0) {
+                  didJump = true;
+                  print('[ShortVideoScreen] index found after load => $index');
+                  if (mounted) {
+                    // If page controller already has clients, jump directly.
+                    if (_pageCtrl.hasClients) {
+                      _pageCtrl.jumpToPage(index);
+                    } else {
+                      // Otherwise update initial page so created controller starts there
+                      setState(() {
+                        _initialPage = index;
+                      });
+                    }
+                  }
+                }
+              } catch (e) {
+                print('[ShortVideoScreen] ever listener error: $e');
+              }
+            });
+          }
+        }
+      } catch (e) {
+        print('[ShortVideoScreen] error reading initial arg: $e');
+      }
+    }
+    _pageCtrl = PageController(initialPage: _initialPage);
+  }
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  final ApiService _apiService = ApiService();
+  String _fullUrl(String path) => _apiService.fullMediaUrl(path);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Obx(() {
-                if (videoController.isLoading.value) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (videoController.videoList.isEmpty) {
-                  return const Center(child: Text("No videos found"));
-                } else {
-                  return PageView.builder(
-                    scrollDirection: Axis.vertical,
-                    onPageChanged: (index) {
-                      videoController.currentIndex.value = index;
-                    },
-                    itemCount: videoController.videoList.length,
-                    itemBuilder: (context, index) {
-                      final video = videoController.videoList[index];
-                      return VideoPlayerWidget(videoUrl: video.videoUrl);
-                    },
-                  );
-                }
-              }),
+      backgroundColor: Colors.black,
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (controller.videos.isEmpty) {
+          return const Center(
+            child: Text(
+              "No videos found",
+              style: TextStyle(color: Colors.white),
             ),
+          );
+        }
 
-            // 🔙 Back Button
-            Positioned(
-              left: AppSizer().width1,
-              top: AppSizer().height2,
-              child: IconButton(
-                onPressed: () {
-                  Get.back();
-                },
-                icon: const Icon(Icons.arrow_back, color: AppColors.appWhite),
-              ),
-            ),
+        return PageView.builder(
+          controller: _pageCtrl,
+          scrollDirection: Axis.vertical,
+          itemCount: controller.videos.length,
+          onPageChanged: controller.setCurrentPage,
+          itemBuilder: (context, index) {
+            final video = controller.videos[index];
+            final videoUrl = _fullUrl(video.videoUrl);
+            print("[ShortVideoScreen] Playing videoUrl: $videoUrl");
 
-            // ❤️ Like, 💬 Comment, 📤 Share
-            Positioned(
-              bottom: AppSizer().height25,
-              right: AppSizer().width2,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  // ❤️ Like
-                  Obx(() {
-                    final currentIndex = videoController.currentIndex.value;
-                    if (videoController.videoList.isEmpty || currentIndex >= videoController.videoList.length) {
-                      return const SizedBox.shrink();
-                    }
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // Video Player
+                VideoPlayerWidget(
+                  videoUrl: videoUrl,
+                  onDoubleTap: () async {
+                    await controller.toggleLike(index);
+                  },
+                ),
 
-                    final video = videoController.videoList[currentIndex];
-                    final currentUserId = videoController.userId;
-
-                    if (currentUserId == null) return const SizedBox.shrink();
-
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        InkWell(
-                          onTap: () {
-                            videoController.likeUnlikeVideo(video.id, currentUserId);
-                          },
-                          child: Icon(
-                            Icons.favorite,
-                            color: video.isLiked ? AppColors.appRed : AppColors.appGrey,
-                            size: 30,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        InkWell(
-                          onTap: () {
-                            Get.dialog(
-                              AlertDialog(
-                                title: const Text("Likes"),
-                                content: SizedBox(
-                                  width: double.maxFinite,
-                                  child: ListView.builder(
-                                    shrinkWrap: true,
-                                    itemCount: video.likedByUsers.length,
-                                    itemBuilder: (context, index) {
-                                      final likedUserId = video.likedByUsers[index];
-                                      return ListTile(
-                                        leading: const CircleAvatar(),
-                                        title: Text("User ID: $likedUserId"),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                          child: Text(
-                            "${video.likedByUsers.length} Like${video.likedByUsers.length == 1 ? '' : 's'}",
-                            style: const TextStyle(color: Colors.white, fontSize: 12),
-                          ),
-                        ),
-                      ],
-                    );
-                  }),
-
-                  SizedBox(height: AppSizer().height5),
-
-                  // 💬 Comment
-                  Obx(() {
-                    final currentIndex = videoController.currentIndex.value;
-                    if (videoController.videoList.isEmpty || currentIndex >= videoController.videoList.length) {
-                      return const SizedBox.shrink();
-                    }
-                    final video = videoController.videoList[currentIndex];
-                    return IconButton(
-                      icon: const Icon(Icons.comment, color: Colors.white, size: 30),
-                      onPressed: () {
-                        Get.bottomSheet(
-                          CommentBottomSheet(videoId: video.id),
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                        );
-                      },
-                    );
-                  }),
-
-                  SizedBox(height: AppSizer().height5),
-                  // 📤 Share
-                  IconButton(
-                    icon: const Icon(Icons.share, color: Colors.white, size: 30),
-                    onPressed: () async {
-                      final currentIndex = videoController.currentIndex.value;
-                      if (currentIndex >= videoController.videoList.length) return;
-
-                      final video = videoController.videoList[currentIndex];
-
-                      final loggedInUserId = await AuthService.getLoggedInUserId() ?? "";
-
-                      String token;
-                      if (Get.isRegistered<TokenController>()) {
-                        token = Get.find<TokenController>().token.value;
-                      } else {
-                        token = (await AuthService.getToken()) ?? "";
-                        Get.put(TokenController(), permanent: true).token.value = token;
-                      }
-
-                      if (loggedInUserId.isEmpty || token.isEmpty) {
-                        Get.snackbar("Error", "User not logged in or token missing!");
-                        return;
-                      }
-
-                      try {
-                        await shareVideoController.shareVideo(
-                          video.id,
-                          loggedInUserId,
-                          token,
-                        );
-                        Get.snackbar("Success", "Video shared successfully!");
-                      } catch (e) {
-                        Get.snackbar("Error", "Failed to share video: $e",backgroundColor: AppColors.appGreen);
-                      }
-                    },
-                  ),
-
-
-                  SizedBox(height: AppSizer().height5),
-                ],
-              ),
-            ),
-
-            // 👇 User Info + Buy button
-            Positioned(
-              bottom: AppSizer().height8,
-              left: AppSizer().width2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                // Bottom left info
+                Positioned(
+                  left: 10,
+                  bottom: 40,
+                  right: 96,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const CircleAvatar(
-                        radius: 15,
-                        backgroundImage: AssetImage("assets/images/property2.jpg"),
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Builder(
+                            builder: (context) {
+                              final avatarUrl = _fullUrl(video.uploaderImage);
+                              final hasAvatar = avatarUrl.isNotEmpty;
+                              return CircleAvatar(
+                                radius: 25,
+                                backgroundColor: Colors.grey[300],
+                                backgroundImage: hasAvatar
+                                    ? NetworkImage(avatarUrl) as ImageProvider
+                                    : null,
+                                child: hasAvatar
+                                    ? null
+                                    : const Icon(
+                                        Icons.person,
+                                        color: Colors.black,
+                                      ),
+                              );
+                            },
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            (video.uploaderName.isNotEmpty)
+                                ? video.uploaderName
+                                : 'Unknown user',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(width: AppSizer().width3),
+                      SizedBox(
+                        height: AppSizer().height1,
+                        width: AppSizer().width3,
+                      ),
                       Text(
-                        '@username',
+                        video.title,
                         style: TextStyle(
-                          color: AppColors.appWhite,
+                          color: Colors.white,
                           fontSize: AppSizer().fontSize16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: AppSizer().height1),
-                  SizedBox(
-                    width: MediaQuery.of(context).size.width / 1.1,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Obx(() {
-                            final videoList = videoController.videoList;
-                            final currentIndex = videoController.currentIndex.value;
+                ),
 
-                            if (videoController.isLoading.value) {
-                              return const Text("Loading...", style: TextStyle(color: AppColors.appWhite));
-                            }
-                            if (videoList.isEmpty || currentIndex >= videoList.length) {
-                              return const Text("No videos available", style: TextStyle(color: AppColors.appWhite));
-                            }
-                            return Text(
-                              videoList[currentIndex].title,
-                              style: const TextStyle(color: AppColors.appWhite, fontSize: 14),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            );
-                          }),
-                        ),
-                        InkWell(
-                          onTap: () {
-                            final currentIndex = videoController.currentIndex.value;
-                            if (currentIndex >= videoController.videoList.length) return;
-                            final v = videoController.videoList[currentIndex];
-
-                            final String selectedCarId =
-                            (v.productId != null && v.productId.toString().isNotEmpty)
-                                ? v.productId.toString()
-                                : v.id.toString();
-
-                            showModalBottomSheet(
-                              context: context,
-                              backgroundColor: AppColors.appBlack.withOpacity(0.95),
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                // Right action column
+                Positioned(
+                  right: 8,
+                  bottom: 80,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Like
+                      Obx(() {
+                        final isLiked = video.isLikedBy(
+                          controller.currentUserId.value,
+                        );
+                        return GestureDetector(
+                          onTap: () async => await controller.toggleLike(index),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.favorite,
+                                color: isLiked ? Colors.red : Colors.white,
+                                size: 36,
                               ),
-                              builder: (context) {
-                                return Padding(
-                                  padding: EdgeInsets.all(AppSizer().height2),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Center(
-                                        child: Container(
-                                          width: AppSizer().width10,
-                                          height: AppSizer().width1,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.appGreen,
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(height: AppSizer().height2),
-                                      const Text(
-                                        "Product Title",
-                                        style: TextStyle(
-                                          color: AppColors.appWhite,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      SizedBox(height: AppSizer().height1),
-                                      const Text(
-                                        "Price: ₹50,00,000",
-                                        style: TextStyle(
-                                          color: AppColors.appGreen,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      SizedBox(height: AppSizer().height1),
-                                      const Text(
-                                        "This is a short description of the product. It includes details like features, location, condition, and other highlights.",
-                                        style: TextStyle(color: AppColors.appWhite),
-                                      ),
-                                      SizedBox(height: AppSizer().height3),
-                                      Align(
-                                        alignment: Alignment.centerRight,
-                                        child: ElevatedButton(
-                                          onPressed: () {
-                                            Get.toNamed(
-                                              AppRoutes.description,
-                                              arguments: selectedCarId,
-                                            );
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.appGreen,
-                                          ),
-                                          child: const Text("Message for buy", style: TextStyle(color: AppColors.appWhite)),
-                                        ),
-                                      ),
-                                      SizedBox(height: AppSizer().height1),
-                                      Align(
-                                        alignment: Alignment.centerRight,
-                                        child: ElevatedButton(
-                                          onPressed: () {
-                                            Get.back();
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.appGreen,
-                                          ),
-                                          child: const Text("Close", style: TextStyle(color: AppColors.appWhite)),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                          child: Container(
-                            height: AppSizer().height4,
-                            width: AppSizer().width10,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: AppColors.appWhite),
-                              borderRadius: BorderRadius.circular(10),
-                              color: AppColors.appBlack,
+                              const SizedBox(height: 6),
+                              Text(
+                                "${video.likes.length}",
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 20),
+
+                      // Comment
+                      GestureDetector(
+                        onTap: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) =>
+                                CommentBottomSheet(videoIndex: index),
+                          );
+                        },
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.comment,
+                              color: Colors.white,
+                              size: 32,
                             ),
-                            child: const Center(
-                              child: Text("Buy", style: TextStyle(color: AppColors.appWhite)),
+                            const SizedBox(height: 6),
+                            Text(
+                              "${video.comments.length}",
+                              style: const TextStyle(color: Colors.white),
                             ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Share
+                      GestureDetector(
+                        onTap: () {
+                          showModalBottomSheet(
+                            context: context,
+                            builder: (_) => ShareVideoBottomSheet(
+                              videoPathOrUrl: video.videoUrl,
+                            ),
+                          );
+                        },
+                        child: Column(
+                          children: const [
+                            Icon(Icons.share, color: Colors.white, size: 30),
+                            SizedBox(height: 6),
+                            Text(
+                              "Share",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Add new video
+                      GestureDetector(
+                        onTap: () {
+                          Get.to(() => PostVideoScreen());
+                        },
+                        child: Column(
+                          children: const [
+                            Icon(
+                              Icons.add_circle,
+                              color: Colors.white,
+                              size: 34,
+                            ),
+                            SizedBox(height: 6),
+                            Text(
+                              "Add",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Top bar
+                Positioned(
+                  top: 40,
+                  left: 12,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => Get.back(),
+                      ),
+                      const SizedBox(width: 8),
+                      Center(
+                        child: const Text(
+                          "Short Videos",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+                ),
+              ],
+            );
+          },
+        );
+      }),
     );
   }
 }

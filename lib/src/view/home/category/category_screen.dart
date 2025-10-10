@@ -1,189 +1,230 @@
-import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
-import 'package:olx_prototype/src/custom_widgets/cards.dart';
-import 'package:olx_prototype/src/utils/app_routes.dart';
-import '../../../constants/app_sizer.dart';
+import 'package:olx_prototype/src/constants/app_sizer.dart';
+import '../../../controller/category_controller.dart';
+import '../../../controller/token_controller.dart';
+import '../../../utils/app_routes.dart';
 
 class CategoryScreen extends StatelessWidget {
   CategoryScreen({super.key});
+  final CategoryController controller = Get.put(CategoryController());
 
-  final List<String> carouselImages = [
-    "assets/images/poster6.jpg",
-    "assets/images/poster7.png",
-    "assets/images/poster8.jpg",
-    "assets/images/poster9.png",
-    "assets/images/poster10.jpg",
-  ];
-
-  final List<String> listviewImages = [
-    "assets/images/car2.jpg",
-    "assets/images/cars.jpg",
-    "assets/images/thaar.jpg",
-    "assets/images/ola.jpeg",
-    "assets/images/phonescarousel.jpg",
-  ];
-
-  final List<String> listviewImages2 = [
-    "assets/images/poster2.jpg",
-    "assets/images/poster4.jpg",
-    "assets/images/carouselbike.jpg",
-    "assets/images/poster5.jpg",
-    "assets/images/poster10.jpg",
-  ];
+  final List<String> categories = ['all', 'cars', 'two-wheeler', 'others'];
 
   @override
   Widget build(BuildContext context) {
-    double screenHeight = MediaQuery.of(context).size.height;
-    double cardHeight = screenHeight * 0.30;
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.appGreen,
-        centerTitle: true,
-        leading: IconButton(
-          onPressed: () => Get.back(),
-          icon: Icon(Icons.arrow_back, color: AppColors.appWhite),
-        ),
-        title: Text(
-          "Category Screen",
-          style: TextStyle(color: AppColors.appWhite),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: AppSizer().height2),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: AppSizer().width2),
-                child: Row(
-                  children: [
-                    _buildTopButton("All Items", Icons.category, () {
-                      Get.toNamed(AppRoutes.category);
-                    }),
-                    _buildTopButton("Cars", Icons.directions_car, () {
-                      Get.toNamed(AppRoutes.carsMarket);
-                    }),
-                    _buildTopButton("Bikes", Icons.pedal_bike, () {
-                      Get.toNamed(AppRoutes.bikes_market);
-                    }),
-                  ],
-                ),
-              ),
-              SizedBox(height: AppSizer().height2),
-              CarouselSlider(
-                options: CarouselOptions(
-                  autoPlay: true,
-                  viewportFraction: 1.0,
-                  autoPlayInterval: const Duration(seconds: 2),
-                  height: screenHeight * 0.26,
-                ),
-                items: carouselImages.map((item) {
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(5),
-                    child: Image.asset(
-                      item,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              SizedBox(height: AppSizer().height2),
-
-              // === First List ===
-              _buildSectionTitle("Second Hand Cars..."),
-              SizedBox(height: AppSizer().height2),
-              SizedBox(
-                height: cardHeight,
-                child: _buildHorizontalList(listviewImages),
-              ),
-
-              SizedBox(height: AppSizer().height2),
-
-              // === Second List ===
-              _buildSectionTitle("All Old Items..."),
-              SizedBox(height: AppSizer().height2),
-              SizedBox(
-                height: cardHeight,
-                child: _buildHorizontalList(listviewImages2),
-              ),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: AppColors.appGreen,
+          centerTitle: true,
+          iconTheme: IconThemeData(color: AppColors.appWhite),
+          title: Text("Category", style: TextStyle(color: AppColors.appWhite)),
+          bottom: TabBar(
+            indicatorColor: Colors.white,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            tabs: [
+              Tab(text: "User"),
+              Tab(text: "Dealer"),
             ],
+            // Tab switch handled by DefaultTabController; no navigation here
           ),
+        ),
+        body: Column(
+          children: [
+            SizedBox(height: AppSizer().height1),
+            _buildCategoryFilter(),
+            SizedBox(height: AppSizer().height1),
+            Expanded(child: _buildProductList()),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildTopButton(String text, IconData icon, VoidCallback onTap) {
-    return Expanded(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal:AppSizer().width1),
-        child: OutlinedButton.icon(
-          style: OutlinedButton.styleFrom(
-            backgroundColor: Color(0xffb0b5b7),
-            padding: EdgeInsets.symmetric(vertical:1),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-          ),
-          icon: Icon(icon, color: AppColors.appBlack, size: 20),
-          label: Text(
-            text,
-            style: TextStyle(
-              fontSize: AppSizer().fontSize15,
-              color: AppColors.appBlack,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          onPressed: onTap,
+  Widget _buildCategoryFilter() {
+    return Obx(
+      () => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: AppSizer().width2),
+        child: Row(
+          children: categories.map((cat) {
+            final isSelected = controller.selectedCategory.value == cat;
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6),
+              child: ChoiceChip(
+                label: Text(cat.capitalizeFirst ?? cat),
+                selected: isSelected,
+                onSelected: (_) {
+                  controller.selectedCategory.value = cat;
+                  controller.fetchProducts();
+                },
+                selectedColor: AppColors.appGreen,
+                backgroundColor: Colors.grey.shade300,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : Colors.black,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: EdgeInsets.all(AppSizer().height1),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: AppColors.appGreen,
-              fontWeight: FontWeight.w600,
-              fontSize: AppSizer().fontSize18,
-            ),
-          ),
-          Divider(height: 2, color: AppColors.appGreen, thickness: 2),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHorizontalList(List<String> images) {
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      itemCount: images.length,
-      itemBuilder: (context, index) {
-        return Container(
-          width: MediaQuery.of(context).size.width * 0.45,
-          margin: EdgeInsets.symmetric(horizontal: AppSizer().width1),
-          child: ProductCard(
-            imagePath: images[index],
-            price: "₹ 1,15,000",
-            roomInfo: "iPhone 14 Pro",
-            description: "iPhone 13 4 month old Bill Box and warranty available",
-            location: "Prayagraj",
-            date: "23 July",
-          ),
+  Widget _buildProductList() {
+    return Obx(() {
+      if (controller.isLoading.value) {
+        return Center(
+          child: CircularProgressIndicator(color: AppColors.appGreen),
         );
-      },
-    );
+      }
+
+      if (controller.productList.isEmpty) {
+        return Center(child: Text("No products found"));
+      }
+
+      return GridView.builder(
+        padding: EdgeInsets.all(6),
+        itemCount: controller.productList.length,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 4,
+          mainAxisSpacing: 8,
+          childAspectRatio: 0.63,
+        ),
+        itemBuilder: (context, index) {
+          final item = controller.productList[index];
+          final isUser = controller.selectedTab.value == 'user';
+          final imageList = isUser ? item['mediaUrl'] : item['images'];
+
+          Widget imageWidget;
+          if (imageList != null &&
+              imageList.isNotEmpty &&
+              imageList[0] != null &&
+              imageList[0].toString().isNotEmpty) {
+            final imageUrl = "https://oldmarket.bhoomi.cloud/${imageList[0]}";
+            imageWidget = Image.network(
+              imageUrl,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            );
+          } else {
+            imageWidget = Image.asset(
+              "assets/images/placeholder.jpg",
+              width: double.infinity,
+              fit: BoxFit.cover,
+            );
+          }
+
+          final location = isUser
+              ? (item['location'] != null && item['location']['city'] != null
+                    ? item['location']['city']
+                    : 'Unknown')
+              : (item['dealerName'] ?? 'Dealer');
+
+          return GestureDetector(
+            onTap: () {
+              final productId = item['_id']?.toString() ?? '';
+
+              if (productId.isEmpty) {
+                print("Product ID missing for item: $item");
+                Get.snackbar("Error", "Product ID is missing");
+                return;
+              }
+
+              final token = Get.find<TokenController>();
+              if (!token.isLoggedIn) {
+                Get.toNamed(AppRoutes.login);
+                return;
+              }
+
+              if (controller.selectedTab.value == 'user') {
+                Get.toNamed(AppRoutes.description, arguments: productId);
+              } else {
+                Get.toNamed(
+                  AppRoutes.dealer_product_description,
+                  arguments: productId,
+                );
+              }
+            },
+            child: Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 4,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(8),
+                      ),
+                      child: imageWidget,
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item['title'] ?? 'No Title',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          SizedBox(height: AppSizer().height1),
+                          Text(
+                            item['description'] ?? 'No Title',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
+                            ),
+                          ),
+                          SizedBox(height: AppSizer().height1),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "₹ ${item['price'] ?? '₹--'} ",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                location,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    });
   }
 }

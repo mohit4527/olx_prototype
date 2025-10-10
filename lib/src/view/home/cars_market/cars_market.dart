@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../controller/token_controller.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
 import 'package:olx_prototype/src/utils/app_routes.dart';
@@ -14,49 +15,49 @@ class CarsMarket extends StatelessWidget {
         'image': 'assets/images/thaar.jpg',
         'price': '₹ 276,000',
         'title': 'Maruti Suzuki',
-        "place" : "Jamshedpur,UP"
+        "place": "Jamshedpur,UP",
       },
       {
         'image': 'assets/images/alto.jpg',
         'price': '₹ 165,000',
         'title': 'Alto 800 2015',
-        "place" : "Singrauli,Bihar"
+        "place": "Singrauli,Bihar",
       },
       {
         'image': 'assets/images/ertiga.jpg',
         'price': '₹ 80,000',
         'title': 'Ertiga',
-        "place" : "America,USA"
+        "place": "America,USA",
       },
       {
         'image': 'assets/images/scorpio.jpg',
         'price': '₹ 1,500,000',
         'title': 'Mahindra Scorpio',
-        "place" : "Raipur,CG"
+        "place": "Raipur,CG",
       },
       {
         'image': 'assets/images/car2.jpg',
         'price': '₹ 1,50,000',
         'title': "Mercedes",
-        "place" : "Prayagraj,UP"
+        "place": "Prayagraj,UP",
       },
       {
         'image': 'assets/images/cars.jpg',
         'price': '₹ 1,32,000',
         'title': 'Bugati',
-        "place" : "Rohtas,Bihar"
+        "place": "Rohtas,Bihar",
       },
       {
         'image': 'assets/images/ertiga.jpg',
         'price': '₹ 80,000',
         'title': 'Ertiga',
-        "place" : "Mumbai,MH"
+        "place": "Mumbai,MH",
       },
       {
         'image': 'assets/images/Suzuki.jpeg',
         'price': '₹ 2,76,000',
         'title': 'Maruti Suzuki',
-        "place" : "Indore,MP"
+        "place": "Indore,MP",
       },
     ];
 
@@ -64,12 +65,15 @@ class CarsMarket extends StatelessWidget {
       appBar: AppBar(
         centerTitle: true,
         backgroundColor: AppColors.appGreen,
-        title: const Text("Cars Market",style: TextStyle(color: AppColors.appWhite),),
+        title: const Text(
+          "Cars Market",
+          style: TextStyle(color: AppColors.appWhite),
+        ),
         leading: IconButton(
           onPressed: () {
             Get.back();
           },
-          icon: const Icon(Icons.arrow_back,color: AppColors.appWhite,),
+          icon: const Icon(Icons.arrow_back, color: AppColors.appWhite),
         ),
       ),
       body: Padding(
@@ -85,8 +89,16 @@ class CarsMarket extends StatelessWidget {
           itemBuilder: (context, index) {
             final car = carList[index];
             return InkWell(
-              onTap: (){
-                Get.toNamed(AppRoutes.description);
+              onTap: () {
+                final token = Get.find<TokenController>();
+                print(
+                  '[CarsMarket] tapped item index: $index, title: ${car['title']}',
+                );
+                if (token.isLoggedIn) {
+                  Get.toNamed(AppRoutes.all_products_screen);
+                } else {
+                  Get.toNamed(AppRoutes.login);
+                }
               },
               child: Container(
                 decoration: BoxDecoration(
@@ -100,8 +112,9 @@ class CarsMarket extends StatelessWidget {
                       height: AppSizer().height25,
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        borderRadius:
-                       BorderRadius.vertical(top: Radius.circular(8)),
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(8),
+                        ),
                         image: DecorationImage(
                           image: AssetImage(car['image']!),
                           fit: BoxFit.cover,
@@ -110,7 +123,7 @@ class CarsMarket extends StatelessWidget {
                     ),
                     SizedBox(height: AppSizer().height2),
                     Padding(
-                      padding:  EdgeInsets.symmetric(horizontal: 8.0),
+                      padding: EdgeInsets.symmetric(horizontal: 8.0),
                       child: Text(
                         car['price']!,
                         style: TextStyle(
@@ -121,8 +134,10 @@ class CarsMarket extends StatelessWidget {
                       ),
                     ),
                     Padding(
-                      padding:
-                     EdgeInsets.symmetric(horizontal: 8.0, vertical: 4),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 8.0,
+                        vertical: 4,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -135,12 +150,16 @@ class CarsMarket extends StatelessWidget {
                           ),
                           Row(
                             children: [
-                              Icon(Icons.place,color: AppColors.appWhite,),
-                              Text(car['place']!,style: TextStyle(
-                                color: AppColors.appWhite,
-                                fontSize: AppSizer().fontSize16,),),
+                              Icon(Icons.place, color: AppColors.appWhite),
+                              Text(
+                                car['place']!,
+                                style: TextStyle(
+                                  color: AppColors.appWhite,
+                                  fontSize: AppSizer().fontSize16,
+                                ),
+                              ),
                             ],
-                          )
+                          ),
                         ],
                       ),
                     ),

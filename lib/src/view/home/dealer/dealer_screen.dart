@@ -3,16 +3,17 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart';
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_sizer.dart';
 import '../../../controller/dealer_controller.dart';
 import '../../../custom_widgets/dealer_screen_widgets.dart';
 
 class DealerProfileScreen extends StatelessWidget {
-  const DealerProfileScreen({super.key});
-
+   DealerProfileScreen({super.key});
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final dealerController = Get.put(DealerProfileController());
 
     return Scaffold(
@@ -33,10 +34,17 @@ class DealerProfileScreen extends StatelessWidget {
         backgroundColor: AppColors.appGreen,
       ),
       body: Container(
-        height: AppSizer().height100,
+        width: double.infinity,
+        height: double.infinity,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: AppColors.appGradient,
+          gradient: isDark
+              ? LinearGradient(
+            colors: [Colors.black, Colors.grey.shade900],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )
+              : LinearGradient(
+            colors: [AppColors.appGreen, Colors.white],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -86,12 +94,14 @@ class DealerProfileScreen extends StatelessWidget {
                     selected: dealerController.selectedDealerType.value == type,
                     onSelected: (_) => dealerController.selectDealerType(type),
                     selectedColor: AppColors.appGreen,
+                    backgroundColor: isDark ? Colors.grey[850] : Colors.white,
                     labelStyle: TextStyle(
                       color: dealerController.selectedDealerType.value == type
                           ? Colors.white
-                          : Colors.black,
+                          : (isDark ? Colors.white : Colors.black),
                     ),
                   );
+
                 }).toList(),
               )),
 
@@ -226,17 +236,19 @@ class DealerProfileScreen extends StatelessWidget {
                 spacing: AppSizer().width2,
                 runSpacing: AppSizer().height1,
                 children: dealerController.paymentMethods.map((method) {
-                  return FilterChip(
-                    label: Text(method),
-                    selected: dealerController.selectedPayments.contains(method),
-                    onSelected: (_) => dealerController.togglePayment(method),
-                    selectedColor: AppColors.appGreen,
-                    labelStyle: TextStyle(
-                      color: dealerController.selectedPayments.contains(method)
-                          ? Colors.white
-                          : Colors.black,
-                    ),
-                  );
+                  return
+                    FilterChip(
+                      label: Text(method),
+                      selected: dealerController.selectedPayments.contains(method),
+                      onSelected: (_) => dealerController.togglePayment(method),
+                      selectedColor: AppColors.appGreen,
+                      backgroundColor: isDark ? Colors.grey[850] : Colors.white,
+                      labelStyle: TextStyle(
+                        color: dealerController.selectedPayments.contains(method)
+                            ? Colors.white
+                            : (isDark ? Colors.white : Colors.black),
+                      ),
+                    );
                 }).toList(),
               )),
 
@@ -247,7 +259,9 @@ class DealerProfileScreen extends StatelessWidget {
                 height: AppSizer().height6,
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: dealerController.isLoading.value ? null : () => dealerController.submitForm(),
+                  onPressed: dealerController.isLoading.value
+                      ? null
+                      : () => dealerController.submitForm(Get.context!),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.appGreen,
                     padding: EdgeInsets.symmetric(vertical: AppSizer().height1),
@@ -268,6 +282,7 @@ class DealerProfileScreen extends StatelessWidget {
                   ),
                 ),
               )),
+
               SizedBox(height: AppSizer().height8),
             ],
           ),

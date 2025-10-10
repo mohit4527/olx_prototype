@@ -13,114 +13,169 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-
+      appBar: AppBar(
+        title: const Text("My Profile"),
+        centerTitle: true,
+        backgroundColor: AppColors.appGreen,
+        elevation: 0,
+      ),
       body: Container(
-        height: AppSizer().height100,
+        width: double.infinity,
+        height: double.infinity,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: AppColors.appGradient,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-      child: SingleChildScrollView(
-        padding: EdgeInsets.all(AppSizer().height1),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(height: AppSizer().height10,),
-            Obx(() => Stack(
-              children: [
-                CircleAvatar(
-                  radius: 55,
-                  backgroundColor: Colors.grey.shade300,
-                  backgroundImage: controller.imagePath.isNotEmpty
-                      ? FileImage(File(controller.imagePath.value))
-                      : null,
-                  child: controller.imagePath.isEmpty
-                      ? const Icon(Icons.person, size: 50)
-                      : null,
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 4,
-                  child: GestureDetector(
-                    onTap: () {
-                      showImagePickerDialog(
-                        context: context,
-                        onCameraTap: controller.getImageByCamera,
-                        onGalleryTap: controller.getImageByGallery,
-                      );
-                    },
-                    child: const CircleAvatar(
-                      radius: 16,
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.edit, size: 18, color: Colors.black),
-                    ),
-                  ),
+          gradient: isDark
+              ? LinearGradient(
+                  colors: [Colors.black, Colors.grey.shade900],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 )
-              ],
-            )),
-            SizedBox(height: AppSizer().height2),
-            Obx(() => Text(
-              controller.profileData['Username'] ?? '',
-              style: TextStyle(
-                  fontSize: AppSizer().fontSize17,
-                  fontWeight: FontWeight.bold),
-            )),
-             Text("Gold Member", style: TextStyle(color: Colors.grey.shade700)),
-            SizedBox(height: AppSizer().height3),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                "INFORMATION",
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontWeight: FontWeight.bold,
-                  fontSize: AppSizer().fontSize17,
+              : LinearGradient(
+                  colors: [AppColors.appGreen, Colors.white],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+        ),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(AppSizer().height1),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(height: AppSizer().height5),
+              Obx(() {
+                final imgPath = controller.imagePath.value;
+                ImageProvider avatarImage;
+                if (imgPath.isNotEmpty) {
+                  if (imgPath.startsWith('http')) {
+                    avatarImage = NetworkImage(imgPath);
+                  } else if (File(imgPath).existsSync()) {
+                    avatarImage = FileImage(File(imgPath));
+                  } else {
+                    avatarImage = const AssetImage(
+                      'assets/images/placeholder.jpg',
+                    );
+                  }
+                } else {
+                  // Use an existing bundled placeholder image
+                  avatarImage = const AssetImage(
+                    'assets/images/placeholder.jpg',
+                  );
+                }
+
+                return Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 60,
+                      backgroundColor: Colors.grey.shade300,
+                      backgroundImage: avatarImage,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: () {
+                          showImagePickerDialog(
+                            onCameraTap: controller.getImageByCamera,
+                            onGalleryTap: controller.getImageByGallery,
+                          );
+                        },
+                        child: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: Colors.white,
+                          child: Icon(
+                            Icons.edit,
+                            size: 20,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }),
+              SizedBox(height: AppSizer().height2),
+              Obx(
+                () => Text(
+                  controller.profileData['Username'] ?? '',
+                  style: TextStyle(
+                    fontSize: AppSizer().fontSize18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            ),
-            SizedBox(height: AppSizer().height1),
-            Obx(() => Column(
-              children: controller.profileData.entries.map((entry) {
-                return Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  child: ListTile(
-                    title: Text(entry.key,
-                        style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: AppSizer().fontSize16)),
-                    subtitle: Text(entry.value,
-                        style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: AppSizer().fontSize15)),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.edit, color: AppColors.appGreen),
-                      onPressed: () {
-                        showEditFieldDialog(
-                          context: context,
-                          fieldName: entry.key,
-                          initialValue: entry.value,
-                          onConfirm: (newValue) =>
-                              controller.updateField(entry.key, newValue),
-                        );
-                      },
-                    ),
-                  ),
+              Obx(() {
+                final role = controller.profileData['Role'] ?? 'User';
+                return Text(
+                  role,
+                  style: TextStyle(color: Colors.grey.shade700),
                 );
-              }).toList(),
-            )),
-          ],
+              }),
+              SizedBox(height: AppSizer().height3),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  "INFORMATION",
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.bold,
+                    fontSize: AppSizer().fontSize17,
+                  ),
+                ),
+              ),
+              SizedBox(height: AppSizer().height1),
+              Obx(() {
+                // Only show selected safe fields
+                final safeKeys = ['Username', 'Phone Number', 'Email', 'Role'];
+                return Column(
+                  children: safeKeys.map((k) {
+                    final v = controller.profileData[k] ?? '';
+                    return Card(
+                      elevation: 2,
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ListTile(
+                        title: Text(
+                          k,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: AppSizer().fontSize16,
+                          ),
+                        ),
+                        subtitle: Text(
+                          v,
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: AppSizer().fontSize15,
+                          ),
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(
+                            Icons.edit,
+                            color: AppColors.appGreen,
+                          ),
+                          onPressed: () {
+                            showEditFieldDialog(
+                              fieldName: k,
+                              initialValue: v,
+                              onConfirm: (newValue) =>
+                                  controller.updateField(k, newValue),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                );
+              }),
+            ],
+          ),
         ),
       ),
-    ),
-
     );
   }
 }

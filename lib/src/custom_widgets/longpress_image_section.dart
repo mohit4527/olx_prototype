@@ -1,14 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
+import 'package:get/get.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
 
 Widget buildLongPressImage(BuildContext context, String imagePath) {
   return GestureDetector(
     onLongPress: () {
-      showDialog(
-        context: context,
-        builder: (_) => Dialog(
+      Get.dialog(
+        Dialog(
           backgroundColor: Colors.transparent,
           child: Container(
             height: AppSizer().height34,

@@ -1,153 +1,74 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
-import 'package:olx_prototype/src/constants/app_colors.dart';
 
-class FeedbackDialog {
-  static void showFeedbackDialog(BuildContext context) {
-    TextEditingController feedbackController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Send Feedback',style: TextStyle(fontWeight: FontWeight.w600),),
-          content: TextField(
-            controller: feedbackController,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              hintText: "Write your feedback here...",
-              border: OutlineInputBorder(),
-            ),
+void showImagePickerDialog({
+  required VoidCallback onCameraTap,
+  required VoidCallback onGalleryTap,
+}) {
+  // Use Get.bottomSheet for consistency with GetX navigation flow
+  Get.bottomSheet(
+    Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Wrap(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.camera_alt),
+            title: const Text("Take Photo"),
+            onTap: () {
+              Get.back();
+              onCameraTap();
+            },
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-              },
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Thank you for your response!",style: TextStyle(color: AppColors.appWhite),),backgroundColor: AppColors.appGreen,),
-                );
-              },
-              child: const Text("Send",style: TextStyle(color: AppColors.appWhite),),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.appGreen,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    )
-                )
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  static void showReportDialog(BuildContext context) {
-    TextEditingController reportController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Send Feedback',style: TextStyle(fontWeight: FontWeight.w600),),
-          content: TextField(
-            controller: reportController,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              hintText: "Write your feedback here...",
-              border: OutlineInputBorder(),
-            ),
+          ListTile(
+            leading: const Icon(Icons.photo_library),
+            title: const Text("Choose from Gallery"),
+            onTap: () {
+              Get.back();
+              onGalleryTap();
+            },
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Thank you for your response!",style: TextStyle(color: AppColors.appWhite),),
-                    backgroundColor: AppColors.appGreen,),
-                );
-              },
-              child:Text("Send",style: TextStyle(color: AppColors.appWhite),),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.appGreen,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    )
-                )
-            ),
-          ],
-        );
-      },
-    );
-  }
-  static void showRatingDialog(BuildContext context) {
-    int selectedRating = 0;
+        ],
+      ),
+    ),
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+  );
+}
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              contentPadding: EdgeInsets.zero,
-              title:  Text("Rate this App",style: TextStyle(fontWeight: FontWeight.w600),),
-              content: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) {
-                  return IconButton(
-                    icon: Icon(
-                      Icons.star,
-                      color: index < selectedRating ? Colors.yellow.shade900 : Colors.grey.shade500,
-                      size: 30,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        selectedRating = index + 1;
-                      });
-                    },
-                  );
-                }),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Get.back();
-                  },
-                  child:  Text("Cancel"),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Get.back();
-                    ScaffoldMessenger.of(context).showSnackBar(
+void showEditFieldDialog({
+  required String fieldName,
+  required String initialValue,
+  required Function(String) onConfirm,
+}) {
+  final TextEditingController textController = TextEditingController(
+    text: initialValue,
+  );
 
-                   SnackBar(content: Text("Thank you for giving the rate and feedback!",style: TextStyle(color: AppColors.appWhite)),backgroundColor: AppColors.appGreen,),
-                    );
-                  },
-                  child: const Text("Submit",style: TextStyle(color: AppColors.appWhite),),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.appGreen,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    )
-                  )
-                ),
-              ],
-            );
+  Get.dialog(
+    AlertDialog(
+      title: Text(
+        "Edit $fieldName",
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+      content: TextField(
+        controller: textController,
+        decoration: const InputDecoration(
+          border: OutlineInputBorder(),
+          hintText: "Enter new value",
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+        ElevatedButton(
+          onPressed: () {
+            onConfirm(textController.text.trim());
+            Get.back();
           },
-        );
-      },
-    );
-  }
+          child: const Text("Update"),
+        ),
+      ],
+    ),
+  );
 }

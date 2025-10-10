@@ -15,7 +15,6 @@ class ProductController extends GetxController {
   void fetchProducts() async {
     try {
       isLoading.value = true;
-
       final response = await ApiService.getAllProducts();
 
       if (response.isNotEmpty) {
@@ -30,8 +29,6 @@ class ProductController extends GetxController {
     }
   }
 
-
-  // Optionally call this after car upload to refresh product list
   void refreshProductList() {
     fetchProducts();
   }

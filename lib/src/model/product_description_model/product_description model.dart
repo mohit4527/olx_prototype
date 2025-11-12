@@ -61,16 +61,30 @@ class ProductModel {
       // an uploader/user object. Try both.
       whatsapp:
           json['whatsapp']?.toString() ??
+          json['number']
+              ?.toString() ?? // 🔥 Fallback: use number for WhatsApp too
           (json['user'] is Map ? json['user']['whatsapp']?.toString() : null) ??
           (json['uploader'] is Map
               ? json['uploader']['whatsapp']?.toString()
               : null),
       phoneNumber:
+          json['number']?.toString() ?? // 🔥 PRIMARY: API sends as "number"
           json['phoneNumber']?.toString() ??
+          json['phone']?.toString() ??
+          json['mobile']?.toString() ??
+          json['contactNumber']?.toString() ??
           (json['user'] is Map ? json['user']['phone']?.toString() : null) ??
+          (json['user'] is Map
+              ? json['user']['phoneNumber']?.toString()
+              : null) ??
           (json['uploader'] is Map
               ? json['uploader']['phone']?.toString()
-              : null),
+              : null) ??
+          (json['uploader'] is Map
+              ? json['uploader']['phoneNumber']?.toString()
+              : null) ??
+          (json['owner'] is Map ? json['owner']['phone']?.toString() : null) ??
+          (json['seller'] is Map ? json['seller']['phone']?.toString() : null),
     );
   }
 

@@ -13,12 +13,36 @@ class ChatDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Chat chat = Get.arguments as Chat;
+    final args = Get.arguments;
     final ChatDetailsController c = Get.put(ChatDetailsController());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      c.initChat(chat);
+      c.initChat(args);
     });
+
+    // determine display chat & sellerName for header rendering
+    Chat chat;
+    String? sellerName;
+    if (args is Chat) {
+      chat = args;
+    } else if (args is Map && args['chat'] is Chat) {
+      chat = args['chat'] as Chat;
+      sellerName = args['sellerName'] as String?;
+    } else {
+      // fallback: create a minimal chat to avoid crashes
+      chat = Chat(
+        id: '',
+        productId: null,
+        productName: null,
+        sellerId: null,
+        buyerId: null,
+        sellerName: sellerName ?? 'Seller',
+        productImage: null,
+        profilePicture: null,
+        lastMessage: null,
+        time: null,
+      );
+    }
 
     return Scaffold(
       key: ValueKey(chat.id),
@@ -33,18 +57,38 @@ class ChatDetailsScreen extends StatelessWidget {
         ),
         title: Row(
           children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: Colors.grey.shade800,
-              backgroundImage: ChatTile.buildChatImage(
-                chat.productImage,
-                chat.profilePicture,
+            GestureDetector(
+              onTap: () {
+                final sellerId = chat.sellerId ?? '';
+                final displayName = sellerName ?? chat.sellerName ?? 'User';
+
+                if (sellerId.isNotEmpty) {
+                  // Navigate to seller products screen with profile mode
+                  Get.toNamed(
+                    '/ads_screen',
+                    arguments: {
+                      'profileUserId': sellerId,
+                      'profileName': displayName,
+                      'profileAvatar': chat.profilePicture ?? '',
+                    },
+                  );
+                }
+              },
+              child: CircleAvatar(
+                radius: 22,
+                backgroundColor: Colors.grey.shade800,
+                backgroundImage: ChatTile.buildChatImage(
+                  chat.productImage,
+                  chat.profilePicture,
+                ),
               ),
             ),
             SizedBox(width: AppSizer().width1),
             Expanded(
               child: Text(
-                chat.displayName,
+                // Prefer product name in the chat header when available,
+                // fall back to provided sellerName or the chat display name.
+                chat.productName ?? sellerName ?? chat.displayName,
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -85,7 +129,10 @@ class ChatDetailsScreen extends StatelessWidget {
 
                 return ListView.builder(
                   key: ValueKey("list-${chat.id}"),
-                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 140),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 16,
+                  ),
                   reverse: true,
                   itemCount: c.messages.length,
                   itemBuilder: (context, index) {
@@ -108,47 +155,54 @@ class ChatDetailsScreen extends StatelessWidget {
   Widget _buildMessageInput(ChatDetailsController c) {
     return Obx(() {
       final ready = c.isReady.value;
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      return Container(
+        color: AppColors.appBlack,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    decoration: BoxDecoration(
+                      color: ready
+                          ? const Color(0xff232e33)
+                          : Colors.grey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: TextField(
+                      controller: c.messageController,
+                      enabled: ready,
+                      style: const TextStyle(color: Colors.white),
+                      minLines: 1,
+                      maxLines: 5,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
+                      decoration: const InputDecoration(
+                        hintText: 'Type a message...',
+                        hintStyle: TextStyle(color: Colors.white70),
+                        border: InputBorder.none,
+                      ),
+                      // We don't use onSubmitted for send because Enter should insert a newline.
+                    ),
+                  ),
+                ),
+                SizedBox(width: AppSizer().width1),
+                Container(
                   decoration: BoxDecoration(
                     color: ready
-                        ? const Color(0xff232e33)
-                        : Colors.grey.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(30),
+                        ? const Color(0xFF075E54)
+                        : Colors.grey.withOpacity(0.5),
+                    shape: BoxShape.circle,
                   ),
-                  child: TextField(
-                    controller: c.messageController,
-                    enabled: ready,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
-                      hintStyle: TextStyle(color: Colors.white70),
-                      border: InputBorder.none,
-                    ),
-                    onSubmitted: (_) => ready ? c.sendMessage() : null,
+                  child: IconButton(
+                    icon: const Icon(Icons.send, color: AppColors.appWhite),
+                    onPressed: ready ? c.sendMessage : null,
                   ),
                 ),
-              ),
-              SizedBox(width: AppSizer().width1),
-              Container(
-                decoration: BoxDecoration(
-                  color: ready
-                      ? const Color(0xFF075E54)
-                      : Colors.grey.withOpacity(0.5),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.send, color: AppColors.appWhite),
-                  onPressed: ready ? c.sendMessage : null,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );

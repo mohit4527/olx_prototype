@@ -9,10 +9,31 @@ import '../../../custom_widgets/chat_screen_helper.dart';
 import '../../../model/chat_model/chat_model.dart';
 import '../../../utils/app_routes.dart';
 
-class OldMarketChatsScreen extends StatelessWidget {
-  OldMarketChatsScreen({Key? key}) : super(key: key);
+class OldMarketChatsScreen extends StatefulWidget {
+  const OldMarketChatsScreen({Key? key}) : super(key: key);
 
-  final ChatController chatController = Get.put(ChatController());
+  @override
+  State<OldMarketChatsScreen> createState() => _OldMarketChatsScreenState();
+}
+
+class _OldMarketChatsScreenState extends State<OldMarketChatsScreen> {
+  late final ChatController chatController;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize controller once
+    chatController = Get.put(ChatController(), permanent: false);
+  }
+
+  @override
+  void dispose() {
+    // Clean disposal
+    if (Get.isRegistered<ChatController>()) {
+      Get.delete<ChatController>();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,42 +56,51 @@ class OldMarketChatsScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          Obx(() {
-            final isSelection = chatController.selectionMode.value;
-            final hasSelected = chatController.selectedChats.isNotEmpty;
-            return isSelection
-                ? IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: hasSelected
-                        ? chatController.deleteSelectedChats
-                        : null,
-                  )
-                : const SizedBox.shrink();
-          }),
+          GetBuilder<ChatController>(
+            builder: (controller) {
+              final isSelection = controller.selectionMode.value;
+              final hasSelected = controller.selectedChats.isNotEmpty;
+              return isSelection
+                  ? IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: hasSelected
+                          ? () {
+                              controller.deleteSelectedChats();
+                              controller.update();
+                            }
+                          : null,
+                    )
+                  : const SizedBox.shrink();
+            },
+          ),
 
           // ✅ Popup Menu
-          Obx(() {
-            final isSelection = chatController.selectionMode.value;
-            return PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'Select All') {
-                  chatController.selectAllChats();
-                } else if (value == 'Cancel') {
-                  chatController.cancelSelection();
-                }
-              },
-              icon: const Icon(Icons.more_vert, color: Colors.white),
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'Select All',
-                  enabled: !isSelection,
-                  child: const Text('Select All'),
-                ),
-                if (isSelection)
-                  const PopupMenuItem(value: 'Cancel', child: Text('Cancel')),
-              ],
-            );
-          }),
+          GetBuilder<ChatController>(
+            builder: (controller) {
+              final isSelection = controller.selectionMode.value;
+              return PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'Select All') {
+                    controller.selectAllChats();
+                    controller.update();
+                  } else if (value == 'Cancel') {
+                    controller.cancelSelection();
+                    controller.update();
+                  }
+                },
+                icon: const Icon(Icons.more_vert, color: Colors.white),
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'Select All',
+                    enabled: !isSelection,
+                    child: const Text('Select All'),
+                  ),
+                  if (isSelection)
+                    const PopupMenuItem(value: 'Cancel', child: Text('Cancel')),
+                ],
+              );
+            },
+          ),
 
           const SizedBox(width: 10),
         ],
@@ -87,37 +117,42 @@ class OldMarketChatsScreen extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: Obx(() {
-                if (chatController.isLoading.value) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (chatController.chats.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      "No chats found",
-                      style: TextStyle(color: Colors.white54),
-                    ),
-                  );
-                }
+              child: GetBuilder<ChatController>(
+                builder: (controller) {
+                  if (controller.isLoading.value) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (controller.chats.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        "No chats found",
+                        style: TextStyle(color: Colors.white54),
+                      ),
+                    );
+                  }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  itemCount: chatController.chats.length,
-                  itemBuilder: (context, index) {
-                    final Chat chat = chatController.chats[index];
-
-                    return Obx(() {
-                      final isSelected = chatController.selectedChats.contains(
+                  return ListView.separated(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    itemCount: controller.chats.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 4),
+                    itemBuilder: (context, index) {
+                      final Chat chat = controller.chats[index];
+                      final isSelected = controller.selectedChats.contains(
                         chat.id,
                       );
-                      final selectionMode = chatController.selectionMode.value;
+                      final selectionMode = controller.selectionMode.value;
 
                       return GestureDetector(
-                        onLongPress: () =>
-                            chatController.toggleSelectionMode(chat.id),
+                        key: ValueKey('chat_${chat.id}_$index'),
+                        onLongPress: () {
+                          controller.toggleSelectionMode(chat.id);
+                          controller.update();
+                        },
                         onTap: () {
                           if (selectionMode) {
-                            chatController.toggleChatSelection(chat.id);
+                            controller.toggleChatSelection(chat.id);
+                            controller.update();
                           } else {
                             if (Get.isRegistered<ChatDetailsController>()) {
                               Get.delete<ChatDetailsController>(force: true);
@@ -129,10 +164,9 @@ class OldMarketChatsScreen extends StatelessWidget {
                           }
                         },
                         child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 4),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
-                            vertical: 4,
+                            vertical: 8,
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
@@ -143,65 +177,74 @@ class OldMarketChatsScreen extends StatelessWidget {
                           child: Row(
                             children: [
                               if (selectionMode)
-                                Checkbox(
-                                  value: isSelected,
-                                  onChanged: (_) => chatController
-                                      .toggleChatSelection(chat.id),
-                                  checkColor: Colors.white,
-                                  activeColor: AppColors.appGreen,
+                                Container(
+                                  width: 56,
+                                  child: Checkbox(
+                                    value: isSelected,
+                                    onChanged: (_) {
+                                      controller.toggleChatSelection(chat.id);
+                                      controller.update();
+                                    },
+                                    checkColor: Colors.white,
+                                    activeColor: AppColors.appGreen,
+                                  ),
                                 )
                               else
-                                // Avatar with unread badge (WhatsApp-like)
-                                Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 28,
-                                      backgroundColor: Colors.grey.shade700,
-                                      backgroundImage: ChatTile.buildChatImage(
-                                        chat.productImage,
-                                        chat.profilePicture,
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 28,
+                                        backgroundColor: Colors.grey.shade700,
+                                        backgroundImage:
+                                            ChatTile.buildChatImage(
+                                              chat.productImage,
+                                              chat.profilePicture,
+                                            ),
                                       ),
-                                    ),
-                                    if (chat.unreadCount > 0)
-                                      Positioned(
-                                        right: -4,
-                                        top: -4,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.redAccent,
-                                            borderRadius: BorderRadius.circular(
-                                              12,
+                                      if (chat.unreadCount > 0)
+                                        Positioned(
+                                          right: -4,
+                                          top: -4,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
                                             ),
-                                            border: Border.all(
-                                              color: Colors.black87,
-                                              width: 1,
-                                            ),
-                                          ),
-                                          constraints: const BoxConstraints(
-                                            minWidth: 18,
-                                            minHeight: 18,
-                                          ),
-                                          child: Center(
-                                            child: Text(
-                                              chat.unreadCount > 99
-                                                  ? '99+'
-                                                  : chat.unreadCount.toString(),
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
+                                            decoration: BoxDecoration(
+                                              color: Colors.redAccent,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              border: Border.all(
+                                                color: Colors.black87,
+                                                width: 1,
                                               ),
-                                              textAlign: TextAlign.center,
+                                            ),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 18,
+                                              minHeight: 18,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                chat.unreadCount > 99
+                                                    ? '99+'
+                                                    : chat.unreadCount
+                                                          .toString(),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -241,10 +284,10 @@ class OldMarketChatsScreen extends StatelessWidget {
                           ),
                         ),
                       );
-                    });
-                  },
-                );
-              }),
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),

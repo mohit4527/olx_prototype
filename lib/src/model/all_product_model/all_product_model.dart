@@ -7,6 +7,7 @@ class AllProductModel {
   final List<String> mediaUrl;
   final bool isBoosted;
   final String whatsapp;
+  final String? phone; // 🔹 Added phone field
   final Location location;
   final String? createdAt;
 
@@ -19,6 +20,7 @@ class AllProductModel {
     required this.mediaUrl,
     required this.isBoosted,
     required this.whatsapp,
+    this.phone, // 🔹 Phone is optional
     required this.location,
     required this.createdAt, // ✅ Add this
   });
@@ -79,6 +81,11 @@ class AllProductModel {
       mediaUrl: media,
       isBoosted: json['isBoosted'] ?? false,
       whatsapp: json['whatsapp'] ?? '',
+      phone:
+          json['number']?.toString() ?? // 🔥 PRIMARY: API sends as "number"
+          json['phone']?.toString() ??
+          json['phoneNumber']?.toString() ??
+          json['userPhone']?.toString(), // 🔹 Extract phone from API
       location: json['location'] != null
           ? Location.fromJson(json['location'])
           : Location(country: '', state: '', city: ''),

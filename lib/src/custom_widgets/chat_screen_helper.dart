@@ -36,7 +36,7 @@ class ChatTile extends StatelessWidget {
         radius: 25,
         backgroundImage: buildChatImage(chat.productImage, chat.profilePicture),
         onBackgroundImageError: (_, __) =>
-        const Icon(Icons.person, color: AppColors.appWhite),
+            const Icon(Icons.person, color: AppColors.appWhite),
       ),
       title: Text(
         chat.displayName,
@@ -50,9 +50,7 @@ class ChatTile extends StatelessWidget {
         chat.lastMessage ?? 'No messages yet',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: Colors.grey,
-        ),
+        style: const TextStyle(color: Colors.grey),
       ),
       trailing: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -79,23 +77,26 @@ class ChatTile extends StatelessWidget {
     );
   }
 
-  static ImageProvider buildChatImage(String? productImage,
-      String? profilePicture) {
+  static ImageProvider buildChatImage(
+    String? productImage,
+    String? profilePicture,
+  ) {
     String? imageUrl;
 
-    if (profilePicture != null && profilePicture.isNotEmpty) {
-      if (profilePicture.startsWith("http")) {
-        imageUrl = profilePicture;
-      } else {
-        imageUrl = "https://oldmarket.bhoomi.cloud/${profilePicture.replaceAll(
-            "\\", "/")}";
-      }
-    } else if (productImage != null && productImage.isNotEmpty) {
+    // अब product image को priority देते हैं क्योंकि chat product के बारे में है
+    if (productImage != null && productImage.isNotEmpty) {
       if (productImage.startsWith("http")) {
         imageUrl = productImage;
       } else {
         imageUrl =
-        "https://oldmarket.bhoomi.cloud/${productImage.replaceAll("\\", "/")}";
+            "https://oldmarket.bhoomi.cloud/${productImage.replaceAll("\\", "/")}";
+      }
+    } else if (profilePicture != null && profilePicture.isNotEmpty) {
+      if (profilePicture.startsWith("http")) {
+        imageUrl = profilePicture;
+      } else {
+        imageUrl =
+            "https://oldmarket.bhoomi.cloud/${profilePicture.replaceAll("\\", "/")}";
       }
     }
 
@@ -107,15 +108,16 @@ class ChatTile extends StatelessWidget {
   }
 }
 
-
-
- // ------------------------- Message Bubble -------------------------
+// ------------------------- Message Bubble -------------------------
 class MessageBubble extends StatelessWidget {
   final Message message;
   final String currentUserId;
 
-  const MessageBubble({Key? key, required this.message, required this.currentUserId})
-      : super(key: key);
+  const MessageBubble({
+    Key? key,
+    required this.message,
+    required this.currentUserId,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

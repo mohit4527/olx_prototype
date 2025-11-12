@@ -17,10 +17,12 @@ class DealerDetailsProductScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<DealerDetailsProductScreen> createState() => _DealerDetailsProductScreenState();
+  State<DealerDetailsProductScreen> createState() =>
+      _DealerDetailsProductScreenState();
 }
 
-class _DealerDetailsProductScreenState extends State<DealerDetailsProductScreen> {
+class _DealerDetailsProductScreenState
+    extends State<DealerDetailsProductScreen> {
   final DealerDetailsController controller = Get.put(DealerDetailsController());
 
   @override
@@ -50,7 +52,8 @@ class _DealerDetailsProductScreenState extends State<DealerDetailsProductScreen>
         ),
       ),
       body: Obx(() {
-        if (controller.isDealerStatsLoading.value || controller.isProductListLoading.value) {
+        if (controller.isDealerStatsLoading.value ||
+            controller.isProductListLoading.value) {
           return const Center(
             child: CircularProgressIndicator(color: Colors.green),
           );
@@ -59,8 +62,9 @@ class _DealerDetailsProductScreenState extends State<DealerDetailsProductScreen>
         final dealer = controller.dealerStats.value;
         final allProducts = controller.products;
         final soldProducts = controller.soldProducts;
-        final stockProducts =
-        allProducts.where((p) => !soldProducts.contains(p)).toList();
+        final stockProducts = allProducts
+            .where((p) => !soldProducts.contains(p))
+            .toList();
 
         List productsToShow;
         if (widget.showSoldOnly) {
@@ -73,7 +77,10 @@ class _DealerDetailsProductScreenState extends State<DealerDetailsProductScreen>
 
         if (dealer == null) {
           return const Center(
-            child: Text("No dealer found", style: TextStyle(color: Colors.grey)),
+            child: Text(
+              "No dealer found",
+              style: TextStyle(color: Colors.grey),
+            ),
           );
         }
 
@@ -86,25 +93,36 @@ class _DealerDetailsProductScreenState extends State<DealerDetailsProductScreen>
               Card(
                 elevation: 3,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("Business Name:",
-                          style: TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold)),
-                      Text(dealer.businessName,
-                          style: const TextStyle(fontSize: 18)),
+                      const Text(
+                        "Business Name:",
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        dealer.businessName,
+                        style: const TextStyle(fontSize: 18),
+                      ),
                       const SizedBox(height: 10),
-                      const Text("Phone:",
-                          style: TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold)),
-                      Text(dealer.phone ?? "Not available",
-                          style: const TextStyle(fontSize: 16)),
+                      const Text(
+                        "Phone:",
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        dealer.phone ?? "Not available",
+                        style: const TextStyle(fontSize: 16),
+                      ),
                     ],
                   ),
                 ),
@@ -119,23 +137,25 @@ class _DealerDetailsProductScreenState extends State<DealerDetailsProductScreen>
                     ? "Available Stock"
                     : "All Products",
                 style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
               ),
               const SizedBox(height: 10),
 
               // Product List
               if (productsToShow.isEmpty)
                 Center(
-                    child: Text(
-                      widget.showSoldOnly
-                          ? "No items sold"
-                          : widget.showStockOnly
-                          ? "No stock available"
-                          : "No products found",
-                      style: const TextStyle(color: Colors.grey),
-                    ))
+                  child: Text(
+                    widget.showSoldOnly
+                        ? "No items sold"
+                        : widget.showStockOnly
+                        ? "No stock available"
+                        : "No products found",
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                )
               else
                 ListView.builder(
                   shrinkWrap: true,
@@ -145,36 +165,120 @@ class _DealerDetailsProductScreenState extends State<DealerDetailsProductScreen>
                     final product = productsToShow[index];
                     return GestureDetector(
                       onTap: () {
-                        Get.to(() =>
-                            DealerDescriptionScreen(productId: product.id));
+                        Get.to(
+                          () => DealerDescriptionScreen(productId: product.id),
+                        );
                       },
                       child: Card(
                         elevation: 4,
                         margin: const EdgeInsets.symmetric(vertical: 8),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
-                          child: Column(
+                          child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(product.title,
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green.shade800)),
-                              const SizedBox(height: 5),
-                              Text(product.description,
-                                  style: const TextStyle(fontSize: 14)),
-                              const SizedBox(height: 5),
-                              Text("Price: ₹${product.price}",
-                                  style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.green.shade700)),
-                              const SizedBox(height: 5),
-                              Text("Location: ${dealer.businessName}",
-                                  style: const TextStyle(
-                                      fontSize: 12, color: Colors.grey)),
+                              // Product Image
+                              Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.grey.shade200,
+                                ),
+                                child: product.images.isNotEmpty
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          "http://oldmarket.bhoomi.cloud/${product.images.first.replaceFirst(RegExp(r'^/+'), '')}",
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                                return const Center(
+                                                  child: Icon(
+                                                    Icons.image_not_supported,
+                                                    color: Colors.grey,
+                                                    size: 30,
+                                                  ),
+                                                );
+                                              },
+                                        ),
+                                      )
+                                    : const Center(
+                                        child: Icon(
+                                          Icons.directions_car,
+                                          color: Colors.grey,
+                                          size: 40,
+                                        ),
+                                      ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Product Details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      product.title,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green.shade800,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      product.description,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          "₹${product.price}",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.green.shade700,
+                                          ),
+                                        ),
+                                        if (product.tags != null &&
+                                            product.tags!.isNotEmpty)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green.shade100,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              product.tags!.first,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.green.shade700,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                         ),

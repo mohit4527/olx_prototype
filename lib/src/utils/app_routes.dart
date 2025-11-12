@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:olx_prototype/src/view/home/ads/ads_screen.dart';
+import 'package:olx_prototype/src/view/home/ads/profile_uploads_screen.dart';
 import 'package:olx_prototype/src/view/home/all_products_screen/all_products_screen.dart';
 import 'package:olx_prototype/src/view/home/bikes_market/bikes_market.dart';
 import 'package:olx_prototype/src/view/home/cars_market/cars_market.dart';
@@ -33,6 +34,7 @@ import 'package:olx_prototype/src/view/login/log_in_screen.dart';
 import 'package:olx_prototype/src/view/signup_screen/signup_screen.dart';
 import 'package:olx_prototype/src/view/splash/splash_screen.dart';
 import 'package:olx_prototype/src/view/verify_otp/verify_otp_screen.dart';
+import 'package:olx_prototype/src/view/splash/welcome_screen.dart';
 import '../view/home/book_test_driveScreen/book_testdrive_screen.dart';
 import '../view/home/sell_user_cars/sell_user_car_screen.dart';
 import '../view/home/ads/edit_product_screen.dart';
@@ -42,6 +44,7 @@ class AppRoutes {
   static String splash = "/splash_screen";
   static String login = "/log_in_screen";
   static String home = "/home_screen";
+  static String welcome = "/welcome_screen";
   static String profile = "/profile_screen";
   static String carsMarket = "/cars_market";
   static String setting = "/setting_screen";
@@ -79,7 +82,8 @@ class AppRoutes {
 }
 
 final Getpages = [
-  GetPage(name: AppRoutes.splash, page: () => SplashScreen()),
+  GetPage(name: AppRoutes.splash, page: () => const AnimatedBrandedSplash()),
+  GetPage(name: AppRoutes.welcome, page: () => const WelcomeScreen()),
   GetPage(name: AppRoutes.profile, page: () => ProfilePage()),
   GetPage(name: AppRoutes.login, page: () => LogInScreen()),
   GetPage(name: AppRoutes.logout, page: () => LogoutScreen()),
@@ -137,6 +141,19 @@ final Getpages = [
   GetPage(name: AppRoutes.setting, page: () => SettingScreen()),
   GetPage(name: AppRoutes.about, page: () => AboutScreen()),
   GetPage(name: AppRoutes.ads, page: () => AdsScreen()),
+  GetPage(
+    name: '/profile_uploads',
+    page: () {
+      final args = Get.arguments;
+      String userId = '';
+      String mode = 'products';
+      if (args is Map) {
+        userId = args['userId']?.toString() ?? '';
+        mode = args['mode']?.toString() ?? 'products';
+      }
+      return ProfileUploadsScreen(userId: userId, mode: mode);
+    },
+  ),
 
   GetPage(name: AppRoutes.sell_user_cars, page: () => SellUserCarScreen()),
   GetPage(name: AppRoutes.sell_dealer_cars, page: () => SellDealerCarScreen()),

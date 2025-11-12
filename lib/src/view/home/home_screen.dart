@@ -1,15 +1,18 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart' hide SearchController;
 import 'package:badges/badges.dart' as badges;
 import 'package:badges/badges.dart' as badges show Badge, BadgePosition;
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
 import 'package:olx_prototype/src/constants/app_strings_constant.dart';
 import 'package:olx_prototype/src/controller/get_profile_controller.dart';
 import 'package:olx_prototype/src/utils/app_routes.dart';
+import 'package:olx_prototype/src/utils/logger.dart';
 import 'package:olx_prototype/src/view/home/ads/ads_screen.dart';
 import 'package:olx_prototype/src/view/home/notifications/notification_screen.dart';
 import 'package:olx_prototype/src/view/home/shortVideo/shortVideo_screen.dart';
@@ -17,6 +20,7 @@ import '../../controller/challan_controller.dart';
 import '../../controller/dealer_details_controller.dart';
 import '../../controller/login_controller.dart';
 import '../../controller/rc_controller.dart';
+import '../../services/auth_service/auth_service.dart';
 import '../../controller/recently_viewed_controller.dart';
 import '../../controller/search_controller.dart';
 import '../../controller/all_products_controller.dart';
@@ -28,7 +32,6 @@ import '../../controller/short_video_controller.dart';
 import '../../controller/token_controller.dart';
 import '../../controller/user_wishlist_controller.dart';
 import '../../custom_widgets/cards.dart';
-import '../../custom_widgets/fuel_popup.dart';
 import '../../custom_widgets/shortVideoWidget.dart';
 // We'll render lightweight thumbnails for most cards and only create a
 // VideoPlayerWidget for the centered item to show a short autoplay preview.
@@ -37,10 +40,9 @@ import '../../model/all_product_model/all_product_model.dart';
 import 'category/category_screen.dart';
 import 'chat/chat_screen.dart';
 import 'dealer_detail/dealer_detail_screen.dart';
-// removed unused imports
 
 class HomeScreen extends StatefulWidget {
-  HomeScreen({super.key});
+  HomeScreen({Key? key}) : super(key: key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -49,9 +51,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final recentlyViewedController = Get.put(RecentlyViewedController());
   final shortVideoController = Get.put(ShortVideoController());
-  // Controller for the horizontal suggested videos list to detect visible item
   final ScrollController _suggestedScrollController = ScrollController();
   int _activePreviewIndex = 0;
+  
+  // 🔥 Add GlobalKey for Scaffold to control drawer
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final UserWishlistController wishlistController = Get.put(
     UserWishlistController(),
   );
@@ -59,51 +63,146 @@ class _HomeScreenState extends State<HomeScreen> {
     DealerWishlistController(),
   );
   final NavigationController controller = Get.put(NavigationController());
-  final productController = Get.find<ProductController>();
+  late final ProductController productController;
   final dController = Get.put(DealerController());
   final rcController = Get.put(RcController());
 
-  TokenController tokenController = Get.find<TokenController>();
+  late final TokenController tokenController;
   final loginController = Get.put(LoginController());
   final SearchController searchcontroller = Get.put(SearchController());
-  final HomeController homeController = Get.find<HomeController>();
-  final dealerController = Get.find<DealerProfileController>();
-
-  /// Try to return up to [limit] of the logged-in user's products.
-  /// Return up to [limit] top products from the global product list.
-  /// This shows items uploaded by any user (recent/featured)
-  Future<List<AllProductModel>> _fetchTopItems({int limit = 4}) async {
-    try {
-      final all = productController.productList;
-      if (all.isEmpty) {
-        // Try to trigger a fetch if list is empty and wait briefly
-        try {
-          await searchcontroller.fetchProducts();
-        } catch (_) {}
-      }
-      return productController.productList
-          .take(limit)
-          .toList()
-          .cast<AllProductModel>();
-    } catch (e) {
-      print('[HomeScreen] _fetchTopItems error: $e');
-      return [];
-    }
-  }
+  late final HomeController homeController;
+  late final DealerProfileController dealerController;
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize controllers safely
+    _initializeControllers();
+    
+    // 🔥 Check if we need to open drawer after navigation
+    _checkDrawerArguments();
+
     // One-time setup
     dController.fetchAllDealers();
-    // Register profile controller if not present
+
+    // 🎲 Fetch all content with randomization on app start
+    searchcontroller.fetchProducts();
+
+    // Add comprehensive shuffle for variety across all sections
+    Timer(const Duration(seconds: 1), () {
+      if (mounted) {
+        print('[HomeScreen] 🎲 App startup - shuffling all content...');
+        productController.shuffleProducts();
+        homeController.shuffleDealerProducts();
+        shortVideoController.shuffleVideos();
+        print('[HomeScreen] ✅ App startup shuffle completed!');
+      }
+    });
+    // Listen to scroll events on suggested videos to activate a single preview
+    _suggestedScrollController.addListener(_onSuggestedScroll);
+  }
+
+  void _initializeControllers() {
+    // Initialize ProductController if not present
+    try {
+      productController = Get.find<ProductController>();
+    } catch (e) {
+      productController = Get.put(ProductController());
+    }
+
+    // Initialize TokenController if not present
+    try {
+      tokenController = Get.find<TokenController>();
+    } catch (e) {
+      tokenController = Get.put(TokenController());
+    }
+
+    // Initialize HomeController if not present
+    try {
+      homeController = Get.find<HomeController>();
+    } catch (e) {
+      homeController = Get.put(HomeController());
+    }
+
+    // 🔥 COMPREHENSIVE: Initialize DealerProfileController with full debugging
+    try {
+      dealerController = Get.find<DealerProfileController>();
+
+      print('🔍 [HomeScreen] INITIALIZATION DEBUG:');
+      print('   - Controller found: ✅');
+      print(
+        '   - isProfileCreated: ${dealerController.isProfileCreated.value}',
+      );
+
+      // Debug SharedPreferences state asynchronously with user-specific keys
+      SharedPreferences.getInstance().then((prefs) async {
+        final userId = await AuthService.getLoggedInUserId();
+        final dealerId = prefs.getString('dealerId_$userId');
+        final cachedState = prefs.getBool('isProfileCreated_$userId');
+
+        print('🔍 [HomeScreen] SharedPreferences Debug (User-Specific):');
+        print('   - userId: $userId');
+        print('   - dealerId_$userId: $dealerId');
+        print('   - cached isProfileCreated: $cachedState');
+      });
+
+      // 🔥 Force immediate profile state refresh with API sync
+      print('🔄 [HomeScreen] Forcing immediate profile state refresh...');
+      dealerController
+          .forceRefreshProfileState()
+          .then((_) {
+            if (mounted) {
+              setState(() {});
+              print(
+                '✅ [HomeScreen] UI refreshed after profile sync - isProfileCreated: ${dealerController.isProfileCreated.value}',
+              );
+            }
+          })
+          .catchError((error) {
+            print('💥 [HomeScreen] Error during profile sync: $error');
+          });
+    } catch (e) {
+      print('🚀 [HomeScreen] Creating new DealerProfileController');
+      dealerController = Get.put(DealerProfileController());
+      print(
+        '✅ [HomeScreen] Created DealerProfileController - isProfileCreated: ${dealerController.isProfileCreated.value}',
+      );
+      // Wait a moment for initialization to complete
+      Future.delayed(Duration(milliseconds: 500), () {
+        print(
+          '⏰ [HomeScreen] After 500ms - isProfileCreated: ${dealerController.isProfileCreated.value}',
+        );
+      });
+    }
+
+    // Initialize GetProfileController if not present
     if (!Get.isRegistered<GetProfileController>()) {
       Get.put(GetProfileController());
     }
-    // Fetch products once
-    searchcontroller.fetchProducts();
-    // Listen to scroll events on suggested videos to activate a single preview
-    _suggestedScrollController.addListener(_onSuggestedScroll);
+  }
+
+  /// Return randomized top products for variety on each app launch
+  Future<List<AllProductModel>> _fetchTopItems({int limit = 4}) async {
+    try {
+      final all = productController.productList;
+      if (all.isEmpty) {
+        try {
+          await searchcontroller.fetchProducts();
+        } catch (_) {}
+      }
+
+      // 🎲 Use randomized products instead of just taking first ones
+      final randomizedItems = productController.getRandomProducts(limit: limit);
+      print(
+        '[HomeScreen] 🎯 _fetchTopItems returning ${randomizedItems.length} randomized top items',
+      );
+
+      return randomizedItems;
+    } catch (e) {
+      print('[HomeScreen] _fetchTopItems error: $e');
+      return [];
+    }
   }
 
   void _onSuggestedScroll() {
@@ -151,13 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return '$baseAssets$rel';
   }
 
-  final List<String> carouselImages = [
-    "assets/images/poster1.jpeg",
-    "assets/images/poster2.jpg",
-    "assets/images/poster3.jpg",
-    "assets/images/poster4.jpg",
-    "assets/images/poster5.jpg",
-  ];
+  // Removed static carousel images - now using API data
 
   List<Map<String, dynamic>> getDrawerItems() {
     final List<Map<String, dynamic>> baseItems = [
@@ -197,15 +290,47 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     ];
 
+    print(
+      '🎯 [HomeScreen] getDrawerItems() - dealerController.isProfileCreated.value: ${dealerController.isProfileCreated.value}',
+    );
+
+    // 🔥 QUICK FIX: Check if user-specific dealerId exists but state is wrong
+    SharedPreferences.getInstance().then((prefs) async {
+      final userId = await AuthService.getLoggedInUserId();
+      final dealerId = prefs.getString('dealerId_$userId');
+      if (dealerId != null &&
+          dealerId.isNotEmpty &&
+          !dealerController.isProfileCreated.value) {
+        print('🚨 [HomeScreen] INCONSISTENT STATE DETECTED!');
+        print('   - userId: $userId');
+        print('   - dealerId exists: $dealerId');
+        print(
+          '   - but isProfileCreated: ${dealerController.isProfileCreated.value}',
+        );
+        print('🔄 [HomeScreen] Triggering force refresh to fix state...');
+        await dealerController.forceRefreshProfileState();
+      }
+    });
+
     if (dealerController.isProfileCreated.value) {
+      print('✅ [HomeScreen] Adding "Edit Business Account" to drawer items');
       baseItems.insert(1, {
-        'name': 'Edit Dealer Profile',
+        'name': 'Edit Business Account',
         'icon': Icons.person,
-        'onTap': () => Get.toNamed(AppRoutes.edit_dealer_profile),
+        'onTap': () {
+          print(
+            '🔍 [HomeScreen] Edit Business Account tapped - Navigating to edit screen',
+          );
+          // 🚀 Navigate directly - EditController will handle data loading from API
+          Get.toNamed(AppRoutes.edit_dealer_profile);
+        },
       });
     } else {
+      print(
+        '❌ [HomeScreen] Adding "Business Account" (create new) to drawer items',
+      );
       baseItems.insert(1, {
-        'name': 'Dealer',
+        'name': 'Business Account',
         'icon': Icons.perm_identity,
         'onTap': () => Get.toNamed(AppRoutes.dealer),
       });
@@ -233,7 +358,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final getProfileController = Get.find<GetProfileController>();
+    // Safely get profile controller, initialize if not found
+    GetProfileController getProfileController;
+    try {
+      getProfileController = Get.find<GetProfileController>();
+    } catch (e) {
+      // Controller not found, initialize it
+      if (!Get.isRegistered<GetProfileController>()) {
+        Get.put(GetProfileController());
+      }
+      getProfileController = Get.find<GetProfileController>();
+    }
+
+    Logger.d(
+      'Home',
+      'build start - size=${MediaQuery.of(context).size} selectedIndex=${controller.selectedIndex.value}',
+    );
     return Obx(() {
       int selectedIndex = controller.selectedIndex.value;
       return WillPopScope(
@@ -246,6 +386,7 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         },
         child: Scaffold(
+          key: _scaffoldKey, // 🔥 Add scaffold key to control drawer
           appBar: selectedIndex == 0
               ? AppBar(
                   iconTheme: const IconThemeData(color: AppColors.appGreen),
@@ -358,13 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             }
                           },
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.local_gas_station,
-                            color: AppColors.appGreen,
-                          ),
-                          onPressed: () => showFuelLocationPopup(context),
-                        ),
+                        // Fuel icon removed per UX request
                       ],
                     ),
                   ],
@@ -537,6 +672,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   SizedBox(height: AppSizer().height1),
                   Expanded(
                     child: Obx(() {
+                      // Force reactivity by explicitly watching the dealer controller's isProfileCreated
+                      final isProfileCreated =
+                          dealerController.isProfileCreated.value;
+                      print(
+                        '🔔 [HomeScreen] Drawer Obx triggered - isProfileCreated: $isProfileCreated',
+                      );
                       final drawerItems = getDrawerItems();
                       return ListView.builder(
                         itemCount: drawerItems.length,
@@ -646,6 +787,50 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     }),
                   ),
+
+                  // 🔥 DEBUG: Manual profile check button
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                      ),
+                      onPressed: () async {
+                        print(
+                          '🔧 [DEBUG] Manual comprehensive profile check triggered',
+                        );
+
+                        // Show loading
+                        Get.snackbar(
+                          'Debug',
+                          'Checking profile state...',
+                          backgroundColor: Colors.blue,
+                          colorText: Colors.white,
+                        );
+
+                        // Force comprehensive sync
+                        await dealerController.forceSyncProfileState();
+
+                        // Update UI
+                        setState(() {});
+
+                        Get.snackbar(
+                          'Debug',
+                          'Profile check completed. isProfileCreated: ${dealerController.isProfileCreated.value}',
+                          backgroundColor: Colors.orange,
+                          colorText: Colors.white,
+                        );
+                      },
+                      child: Text(
+                        'DEBUG: Check Profile',
+                        style: TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -654,317 +839,1251 @@ class _HomeScreenState extends State<HomeScreen> {
             switch (controller.selectedIndex.value) {
               case 0:
                 return SafeArea(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(height: AppSizer().height2),
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: SizedBox(
-                                height: AppSizer().height6,
-                                child: TextField(
-                                  onChanged: searchcontroller.searchProducts,
-                                  decoration: InputDecoration(
-                                    fillColor: AppColors.appGreen.withOpacity(
-                                      0.3,
-                                    ),
-                                    filled: true,
-                                    border: OutlineInputBorder(
-                                      borderSide: BorderSide.none,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    suffixIcon: IconButton(
-                                      onPressed: () {
-                                        searchcontroller.searchProducts(
-                                          "",
-                                        ); // reset search
-                                      },
-                                      icon: const Icon(
-                                        Icons.search,
-                                        color: Color(0xff11a35a),
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      print('[HomeScreen] 🔄 COMPREHENSIVE REFRESH triggered');
+
+                      // Show refresh feedback
+                      Get.snackbar(
+                        "🔄 Refreshing Everything",
+                        "Loading fresh randomized content for all sections...",
+                        snackPosition: SnackPosition.TOP,
+                        duration: const Duration(seconds: 2),
+                        backgroundColor: Colors.green,
+                        colorText: Colors.white,
+                      );
+
+                      // 🎲 COMPREHENSIVE REFRESH - All sections with randomization
+                      print('[HomeScreen] 📱 Refreshing All Products...');
+                      productController.refreshProductList();
+
+                      print('[HomeScreen] 🔍 Refreshing Search Products...');
+                      searchcontroller.fetchProducts();
+
+                      print('[HomeScreen] 🏪 Refreshing Dealer Products...');
+                      homeController.fetchDealerProducts();
+
+                      print('[HomeScreen] 🎬 Refreshing Videos...');
+                      shortVideoController.refreshVideos();
+
+                      print('[HomeScreen] 📺 Refreshing Dashboard Ads...');
+                      homeController.fetchDashboardAds();
+
+                      // Extra shuffle for immediate variety
+                      Timer(const Duration(milliseconds: 500), () {
+                        print('[HomeScreen] 🎲 Applying extra shuffle...');
+                        productController.shuffleProducts();
+                        homeController.shuffleDealerProducts();
+                        shortVideoController.shuffleVideos();
+                      });
+
+                      // UX delay for smooth experience
+                      await Future.delayed(const Duration(milliseconds: 1200));
+
+                      print('[HomeScreen] ✅ COMPREHENSIVE REFRESH completed!');
+                    },
+                    color: AppColors.appGreen,
+                    backgroundColor: Colors.white,
+                    child: SingleChildScrollView(
+                      physics:
+                          const AlwaysScrollableScrollPhysics(), // Enable pull-to-refresh
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(height: AppSizer().height2),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: SizedBox(
+                                  height: AppSizer().height6,
+                                  child: TextField(
+                                    onChanged: searchcontroller.searchProducts,
+                                    decoration: InputDecoration(
+                                      fillColor: AppColors.appGreen.withOpacity(
+                                        0.3,
                                       ),
+                                      filled: true,
+                                      border: OutlineInputBorder(
+                                        borderSide: BorderSide.none,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      suffixIcon: IconButton(
+                                        onPressed: () {
+                                          searchcontroller.searchProducts(
+                                            "",
+                                          ); // reset search
+                                        },
+                                        icon: const Icon(
+                                          Icons.search,
+                                          color: Color(0xff11a35a),
+                                        ),
+                                      ),
+                                      hintText: 'Search Products...',
+                                      hintStyle: const TextStyle(
+                                        color: Colors.grey,
+                                      ),
+                                      contentPadding: const EdgeInsets.all(10),
                                     ),
-                                    hintText: 'Search Products...',
-                                    hintStyle: const TextStyle(
-                                      color: Colors.grey,
-                                    ),
-                                    contentPadding: const EdgeInsets.all(10),
                                   ),
                                 ),
                               ),
-                            ),
 
-                            SizedBox(height: AppSizer().height1),
-                            Obx(() {
-                              if (searchcontroller.isLoading.value) {
-                                return const Center(
-                                  child: CircularProgressIndicator(),
-                                );
-                              }
-                              if (searchcontroller.products.isNotEmpty) {
-                                return SizedBox(
-                                  height: AppSizer().height30,
-                                  child: ListView.builder(
-                                    scrollDirection: Axis.horizontal,
-                                    itemCount: searchcontroller.products.length,
-                                    itemBuilder: (context, index) {
-                                      final product =
-                                          searchcontroller.products[index];
-                                      final imageUrl =
-                                          product.mediaUrl.isNotEmpty
-                                          ? "https://oldmarket.bhoomi.cloud/${product.mediaUrl.first}"
-                                          : 'https://via.placeholder.com/150';
-                                      return Padding(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: AppSizer().width1,
-                                        ),
-                                        child: AspectRatio(
-                                          aspectRatio: 2.3 / 3,
-                                          child: InkWell(
-                                            onTap: () {
-                                              recentlyViewedController
-                                                  .addProduct(
-                                                    RecentlyViewedModel(
-                                                      id: product.id,
-                                                      title: product.title,
-                                                      image:
-                                                          product
-                                                              .mediaUrl
-                                                              .isNotEmpty
-                                                          ? product
+                              SizedBox(height: AppSizer().height1),
+                              Obx(() {
+                                if (searchcontroller.isLoading.value) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
+                                  );
+                                }
+                                if (searchcontroller.products.isNotEmpty) {
+                                  return SizedBox(
+                                    height: AppSizer().height30,
+                                    child: ListView.builder(
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount:
+                                          searchcontroller.products.length,
+                                      itemBuilder: (context, index) {
+                                        final product =
+                                            searchcontroller.products[index];
+                                        final imageUrl =
+                                            product.mediaUrl.isNotEmpty
+                                            ? "https://oldmarket.bhoomi.cloud/${product.mediaUrl.first}"
+                                            : 'https://via.placeholder.com/150';
+                                        return Padding(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: AppSizer().width1,
+                                          ),
+                                          child: AspectRatio(
+                                            aspectRatio: 2.3 / 3,
+                                            child: InkWell(
+                                              onTap: () {
+                                                recentlyViewedController
+                                                    .addProduct(
+                                                      RecentlyViewedModel(
+                                                        id: product.id,
+                                                        title: product.title,
+                                                        image:
+                                                            product
                                                                 .mediaUrl
-                                                                .first
-                                                          : "",
-                                                      price: product.price
-                                                          .toString(),
-                                                      type: "all",
-                                                      createdAt: DateTime.now(),
-                                                    ),
-                                                  );
-                                              Get.toNamed(
-                                                AppRoutes.description,
-                                                arguments: product.id,
-                                              );
-                                            },
-                                            child: ProductCard(
-                                              imagePath: imageUrl,
-                                              roomInfo: product.title,
-                                              price: "₹ ${product.price}",
-                                              description: product.description,
-                                              location: product.city,
-                                              date: parseDateString(
-                                                product.createdAt,
+                                                                .isNotEmpty
+                                                            ? product
+                                                                  .mediaUrl
+                                                                  .first
+                                                            : "",
+                                                        price: product.price
+                                                            .toString(),
+                                                        type: "all",
+                                                        createdAt:
+                                                            DateTime.now(),
+                                                      ),
+                                                    );
+                                                Get.toNamed(
+                                                  AppRoutes.description,
+                                                  arguments: product.id,
+                                                );
+                                              },
+                                              child: ProductCard(
+                                                imagePath: imageUrl,
+                                                roomInfo: product.title,
+                                                price: "₹ ${product.price}",
+                                                description:
+                                                    product.description,
+                                                location: product.city,
+                                                date: parseDateString(
+                                                  product.createdAt,
+                                                ),
+                                                productId: product.id,
                                               ),
-                                              productId: product.id,
                                             ),
                                           ),
-                                        ),
+                                        );
+                                      },
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              }),
+                              SizedBox(height: AppSizer().height3),
+                              // 🔥 NEW: Dashboard Ads Carousel
+                              Obx(() {
+                                if (homeController.isLoadingAds.value) {
+                                  return Container(
+                                    height: AppSizer().height26,
+                                    margin: EdgeInsets.symmetric(
+                                      horizontal: 5.0,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: AppColors.appGrey,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.grey.shade200,
+                                    ),
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        color: AppColors.appGreen,
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                if (homeController.dashboardAds.isEmpty) {
+                                  // Fallback to static images if no ads available
+                                  final fallbackImages = [
+                                    "assets/images/poster1.jpeg",
+                                    "assets/images/poster2.jpg",
+                                    "assets/images/poster3.jpg",
+                                  ];
+                                  return CarouselSlider(
+                                    options: CarouselOptions(
+                                      autoPlay: true,
+                                      autoPlayInterval: const Duration(
+                                        seconds: 3,
+                                      ),
+                                      height: AppSizer().height26,
+                                      viewportFraction: 1.0,
+                                    ),
+                                    items: fallbackImages.map((item) {
+                                      return Builder(
+                                        builder: (BuildContext context) {
+                                          return Container(
+                                            width: MediaQuery.of(
+                                              context,
+                                            ).size.width,
+                                            margin: EdgeInsets.symmetric(
+                                              horizontal: 5.0,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(
+                                                color: AppColors.appGrey,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              color: AppColors.appWhite,
+                                            ),
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              child: Image.asset(
+                                                item,
+                                                fit: BoxFit.cover,
+                                                height: AppSizer().height16,
+                                              ),
+                                            ),
+                                          );
+                                        },
                                       );
-                                    },
+                                    }).toList(),
+                                  );
+                                }
+
+                                // 🎯 API Dashboard Ads Carousel
+                                return CarouselSlider(
+                                  options: CarouselOptions(
+                                    autoPlay: true,
+                                    autoPlayInterval: const Duration(
+                                      seconds: 4,
+                                    ),
+                                    height: AppSizer().height26,
+                                    viewportFraction: 1.0,
                                   ),
+                                  items: homeController.dashboardAds.map((ad) {
+                                    // Get first image from ads or use placeholder
+                                    final imageUrl =
+                                        ad.images?.isNotEmpty == true
+                                        ? "https://oldmarket.bhoomi.cloud/${ad.images!.first}"
+                                        : null;
+
+                                    return Builder(
+                                      builder: (BuildContext context) {
+                                        return Container(
+                                          width: MediaQuery.of(
+                                            context,
+                                          ).size.width,
+                                          margin: EdgeInsets.symmetric(
+                                            horizontal: 5.0,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: AppColors.appGrey,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            color: AppColors.appWhite,
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            child: imageUrl != null
+                                                ? Image.network(
+                                                    imageUrl,
+                                                    fit: BoxFit.cover,
+                                                    height: AppSizer().height16,
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      return Container(
+                                                        color: Colors
+                                                            .grey
+                                                            .shade300,
+                                                        child: Center(
+                                                          child: Column(
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .center,
+                                                            children: [
+                                                              Icon(
+                                                                Icons
+                                                                    .image_not_supported,
+                                                                color: Colors
+                                                                    .grey
+                                                                    .shade600,
+                                                                size: 40,
+                                                              ),
+                                                              SizedBox(
+                                                                height: 8,
+                                                              ),
+                                                              Text(
+                                                                ad.title ??
+                                                                    'Dashboard Ad',
+                                                                style: TextStyle(
+                                                                  color: Colors
+                                                                      .grey
+                                                                      .shade600,
+                                                                  fontSize: 14,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                                  )
+                                                : Container(
+                                                    color: Colors.grey.shade300,
+                                                    child: Center(
+                                                      child: Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Icon(
+                                                            Icons.campaign,
+                                                            color: AppColors
+                                                                .appGreen,
+                                                            size: 50,
+                                                          ),
+                                                          SizedBox(height: 8),
+                                                          Text(
+                                                            ad.title ??
+                                                                'Dashboard Ad',
+                                                            style: TextStyle(
+                                                              color: AppColors
+                                                                  .appGreen,
+                                                              fontSize: 16,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  }).toList(),
                                 );
-                              }
-                              return const SizedBox.shrink();
-                            }),
-                            SizedBox(height: AppSizer().height3),
-                            CarouselSlider(
-                              options: CarouselOptions(
-                                autoPlay: true,
-                                autoPlayInterval: const Duration(seconds: 2),
-                                height: AppSizer().height26,
-                                viewportFraction: 1.0,
+                              }),
+                              Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: AppSizer().width3,
+                                  vertical: AppSizer().height2,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.receipt_long,
+                                            size: AppSizer().height10,
+                                            color: AppColors.appGreen,
+                                          ),
+                                          SizedBox(height: AppSizer().height1),
+                                          Text(
+                                            "Check vehicle reports",
+                                            style: TextStyle(
+                                              fontSize: AppSizer().fontSize18,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.appGreen,
+                                            ),
+                                          ),
+                                          SizedBox(height: AppSizer().height1),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            child: ElevatedButton.icon(
+                                              onPressed: () {
+                                                final loginController =
+                                                    Get.find<LoginController>();
+                                                final challanController =
+                                                    Get.find<
+                                                      ChallanController
+                                                    >();
+
+                                                if (loginController
+                                                    .tokenController
+                                                    .apiToken
+                                                    .value
+                                                    .isEmpty) {
+                                                  Get.snackbar(
+                                                    "Login Required",
+                                                    "Please login first to continue",
+                                                    backgroundColor: Colors.red,
+                                                    colorText: Colors.white,
+                                                  );
+                                                  Get.toNamed(AppRoutes.login);
+                                                } else {
+                                                  challanController
+                                                      .showChallanPopup(
+                                                        Get.context!,
+                                                      );
+                                                }
+                                              },
+                                              icon: const Icon(
+                                                Icons.search,
+                                                color: Colors.white,
+                                              ),
+                                              label: Text(
+                                                "Vehicle Credit Report",
+                                                style: TextStyle(
+                                                  fontSize:
+                                                      AppSizer().fontSize16,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                minimumSize: Size(
+                                                  double.infinity,
+                                                  AppSizer().height5,
+                                                ),
+                                                backgroundColor:
+                                                    AppColors.appGreen,
+                                                padding: EdgeInsets.symmetric(
+                                                  vertical: AppSizer().height1,
+                                                ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        AppSizer().height1,
+                                                      ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              items: carouselImages.map((item) {
-                                return Builder(
-                                  builder: (BuildContext context) {
-                                    return Container(
-                                      width: MediaQuery.of(context).size.width,
-                                      margin: EdgeInsets.symmetric(
-                                        horizontal: 5.0,
+
+                              Obx(() {
+                                final recentlyViewed =
+                                    recentlyViewedController.recentlyViewed;
+
+                                if (recentlyViewed.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: AppSizer().height1,
                                       ),
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: AppColors.appGrey,
+                                      child: Column(
+                                        children: [
+                                          Text(
+                                            "Recently Viewed",
+                                            style: TextStyle(
+                                              color: AppColors.appGreen,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: AppSizer().fontSize19,
+                                            ),
+                                          ),
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                              top: 0,
+                                            ),
+                                            height: 1.5,
+                                            width: 140,
+                                            color: AppColors.appGreen,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(height: AppSizer().height4),
+                                    SizedBox(
+                                      height: 130,
+                                      child: ListView.builder(
+                                        scrollDirection: Axis.horizontal,
+                                        itemCount: recentlyViewed.length,
+                                        itemBuilder: (context, index) {
+                                          final product = recentlyViewed[index];
+                                          final bool hasImage =
+                                              product.image.isNotEmpty;
+                                          final String imageUrl =
+                                              "https://oldmarket.bhoomi.cloud/${product.image}";
+
+                                          return GestureDetector(
+                                            onTap: () {
+                                              if (product.type == "dealer") {
+                                                Get.toNamed(
+                                                  AppRoutes
+                                                      .dealer_product_description,
+                                                  arguments: product.id,
+                                                );
+                                              } else {
+                                                Get.toNamed(
+                                                  AppRoutes.description,
+                                                  arguments: product.id,
+                                                );
+                                              }
+                                            },
+                                            child: Container(
+                                              width: 120,
+                                              margin:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                child: hasImage
+                                                    ? Image.network(
+                                                        imageUrl,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder:
+                                                            (
+                                                              context,
+                                                              error,
+                                                              stackTrace,
+                                                            ) {
+                                                              return Image.asset(
+                                                                "assets/images/placeholder.jpg",
+                                                                fit: BoxFit
+                                                                    .cover,
+                                                              );
+                                                            },
+                                                      )
+                                                    : Image.asset(
+                                                        "assets/images/placeholder.jpg",
+                                                        fit: BoxFit.cover,
+                                                      ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
+                              SizedBox(height: AppSizer().height3),
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  left: AppSizer().height1,
+                                  right: AppSizer().height1,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      children: [
+                                        Text(
+                                          "All Products.",
+                                          style: TextStyle(
+                                            color: AppColors.appGreen,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: AppSizer().fontSize19,
+                                          ),
                                         ),
-                                        borderRadius: BorderRadius.circular(8),
-                                        color: AppColors.appWhite,
+                                        Container(
+                                          margin: const EdgeInsets.only(top: 0),
+                                          height: 1.5,
+                                          width: 105,
+                                          color: AppColors.appGreen,
+                                        ),
+                                      ],
+                                    ),
+                                    InkWell(
+                                      onTap: () {
+                                        if (tokenController.isLoggedIn) {
+                                          Get.toNamed(AppRoutes.description);
+                                        } else {
+                                          Get.toNamed(AppRoutes.login);
+                                        }
+                                      },
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            "View More",
+                                            style: TextStyle(
+                                              color: AppColors.appGreen,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: AppSizer().fontSize17,
+                                            ),
+                                          ),
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                              top: 0,
+                                            ),
+                                            height: 1.5,
+                                            width: 75,
+                                            color: AppColors.appGreen,
+                                          ),
+                                        ],
                                       ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.asset(
-                                          item,
-                                          fit: BoxFit.cover,
-                                          height: AppSizer().height16,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: AppSizer().height3),
+                              Obx(() {
+                                if (productController.isLoading.value) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
+                                  );
+                                }
+                                // 🎲 Use randomized products for variety
+                                final limitedProducts = productController
+                                    .getRandomProducts(limit: 8);
+
+                                print(
+                                  '[HomeScreen] 🏠 Displaying ${limitedProducts.length} randomized products',
+                                );
+
+                                return GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: limitedProducts.length,
+                                  padding: const EdgeInsets.all(6),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 2,
+                                        mainAxisSpacing: 5,
+                                        crossAxisSpacing: 2,
+                                        childAspectRatio: 0.70,
+                                      ),
+                                  itemBuilder: (context, index) {
+                                    final product = limitedProducts[index];
+                                    final String imageUrl =
+                                        product.mediaUrl.isNotEmpty
+                                        ? "https://oldmarket.bhoomi.cloud/${product.mediaUrl.first}"
+                                        : 'assets/images/placeholder.jpg';
+                                    // wishlist usage intentionally omitted here
+                                    return InkWell(
+                                      onTap: () {
+                                        recentlyViewedController.addProduct(
+                                          RecentlyViewedModel(
+                                            id: product.id,
+                                            title: product.title,
+                                            image: product.mediaUrl.isNotEmpty
+                                                ? product.mediaUrl.first
+                                                : "",
+                                            price: product.price.toString(),
+                                            type: "all",
+                                            createdAt: DateTime.now(),
+                                          ),
+                                        );
+                                        if (tokenController.isLoggedIn) {
+                                          Get.toNamed(
+                                            AppRoutes.description,
+                                            arguments: product.id,
+                                          );
+                                        } else {
+                                          Get.toNamed(AppRoutes.login);
+                                        }
+                                      },
+                                      child: ProductCard(
+                                        productId: product.id,
+                                        imagePath: imageUrl,
+                                        roomInfo: product.title,
+                                        price: "₹ ${product.price}",
+                                        description: product.description,
+                                        location: product.location.city,
+                                        date: parseDateString(
+                                          product.createdAt,
                                         ),
                                       ),
                                     );
                                   },
                                 );
-                              }).toList(),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: AppSizer().width3,
-                                vertical: AppSizer().height2,
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  // ✅ Check Challan Section
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.receipt_long,
-                                        size: AppSizer().height10,
-                                        color: AppColors.appGreen,
-                                      ),
-                                      SizedBox(height: AppSizer().height1),
-                                      Text(
-                                        "Check Challan",
-                                        style: TextStyle(
-                                          fontSize: AppSizer().fontSize18,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.appGreen,
-                                        ),
-                                      ),
-                                      SizedBox(height: AppSizer().height1),
-                                      ElevatedButton.icon(
-                                        onPressed: () {
-                                          final loginController =
-                                              Get.find<LoginController>();
-                                          final challanController =
-                                              Get.find<ChallanController>();
+                              }),
+                              SizedBox(height: AppSizer().height2),
+                              Obx(() {
+                                print(
+                                  "Suggested Videos Length: ${shortVideoController.suggestedVideos.length}",
+                                );
 
-                                          if (loginController
-                                              .tokenController
-                                              .apiToken
-                                              .value
-                                              .isEmpty) {
-                                            Get.snackbar(
-                                              "Login Required",
-                                              "Please login first to continue",
-                                              backgroundColor: Colors.red,
-                                              colorText: Colors.white,
-                                            );
-                                            Get.toNamed(AppRoutes.login);
-                                          } else {
-                                            challanController.showChallanPopup(
-                                              Get.context!,
-                                            );
-                                          }
-                                        },
-                                        icon: const Icon(
-                                          Icons.search,
-                                          color: Colors.white,
-                                        ),
-                                        label: Text(
-                                          "Check Challan",
-                                          style: TextStyle(
-                                            fontSize: AppSizer().fontSize16,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          minimumSize: Size(
-                                            AppSizer().width40,
-                                            AppSizer().height5,
-                                          ),
-                                          backgroundColor: AppColors.appGreen,
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: AppSizer().height1,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              AppSizer().height1,
+                                if (shortVideoController
+                                    .isLoadingVideos
+                                    .value) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
+                                  );
+                                }
+
+                                if (shortVideoController
+                                    .suggestedVideos
+                                    .isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Section title
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: AppSizer().height1,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            "Suggested Videos",
+                                            style: TextStyle(
+                                              color: AppColors.appGreen,
+                                              fontSize: AppSizer().fontSize19,
+                                              fontWeight: FontWeight.bold,
                                             ),
                                           ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  // ✅ Check RC Section
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.car_repair,
-                                        size: AppSizer().height10,
-                                        color: AppColors.appGreen,
-                                      ),
-                                      SizedBox(height: AppSizer().height1),
-                                      Text(
-                                        "Check RC",
-                                        style: TextStyle(
-                                          fontSize: AppSizer().fontSize18,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.appGreen,
-                                        ),
-                                      ),
-                                      SizedBox(height: AppSizer().height1),
-                                      ElevatedButton.icon(
-                                        onPressed: () {
-                                          rcController.showRcPopup(context);
-                                        },
-                                        icon: const Icon(
-                                          Icons.search,
-                                          color: Colors.white,
-                                        ),
-                                        label: Text(
-                                          "Check RC",
-                                          style: TextStyle(
-                                            fontSize: AppSizer().fontSize16,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          minimumSize: Size(
-                                            AppSizer().width40,
-                                            AppSizer().height5,
-                                          ),
-                                          backgroundColor: AppColors.appGreen,
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: AppSizer().height1,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              AppSizer().height1,
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                              top: 4,
                                             ),
+                                            height: 1.5,
+                                            width: 145,
+                                            color: AppColors.appGreen,
                                           ),
-                                        ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
+                                    ),
 
-                            Obx(() {
-                              final recentlyViewed =
-                                  recentlyViewedController.recentlyViewed;
+                                    SizedBox(height: AppSizer().height2),
 
-                              if (recentlyViewed.isEmpty) {
-                                return const SizedBox.shrink();
-                              }
+                                    // Horizontal video list - only the centered item will
+                                    // show an autoplaying, muted VideoPlayerWidget. Others
+                                    // show static thumbnails to conserve resources.
+                                    SizedBox(
+                                      height: AppSizer().height12 * 2.5,
+                                      child: ListView.builder(
+                                        controller: _suggestedScrollController,
+                                        scrollDirection: Axis.horizontal,
+                                        itemCount: shortVideoController
+                                            .suggestedVideos
+                                            .length,
+                                        itemBuilder: (context, index) {
+                                          final video = shortVideoController
+                                              .suggestedVideos[index];
 
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: AppSizer().height1,
+                                          final thumbPath =
+                                              video.thumbnailUrl.isNotEmpty
+                                              ? _fullVideoUrl(
+                                                  video.thumbnailUrl,
+                                                )
+                                              : (video.videoUrl.isNotEmpty
+                                                    ? _fullVideoUrl(
+                                                        video.videoUrl,
+                                                      )
+                                                    : '');
+
+                                          // previously used to show only one active preview
+
+                                          return GestureDetector(
+                                            onTap: () {
+                                              final vid = shortVideoController
+                                                  .suggestedVideos[index]
+                                                  .id;
+                                              print(
+                                                '[HomeScreen] Tapped suggested video id: $vid',
+                                              );
+                                              Get.toNamed(
+                                                AppRoutes.shortVideo,
+                                                arguments: {
+                                                  'videos': shortVideoController
+                                                      .suggestedVideos,
+                                                  'currentIndex': index,
+                                                  'id': vid,
+                                                },
+                                              );
+                                            },
+                                            child: Container(
+                                              width: 150,
+                                              margin: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                                color: Colors.black12,
+                                              ),
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                                child: SizedBox(
+                                                  width: 150,
+                                                  height: double.infinity,
+                                                  child: thumbPath.isNotEmpty
+                                                      ? VideoPlayerWidget(
+                                                          videoUrl:
+                                                              _fullVideoUrl(
+                                                                video.videoUrl,
+                                                              ),
+                                                          muted: true,
+                                                          enableTapToToggle:
+                                                              false,
+                                                        )
+                                                      : Image.asset(
+                                                          'assets/images/placeholder.jpg',
+                                                          fit: BoxFit.cover,
+                                                        ),
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
+                              // --- Top Items (User's products) - inserted after Certified Dealers ---
+                              FutureBuilder<List<AllProductModel>>(
+                                future: _fetchTopItems(limit: 4),
+                                builder: (context, snap) {
+                                  if (snap.connectionState ==
+                                      ConnectionState.waiting)
+                                    return const SizedBox.shrink();
+                                  final items = snap.data ?? [];
+                                  if (items.isEmpty)
+                                    return const SizedBox.shrink();
+                                  return Padding(
+                                    padding: EdgeInsets.only(
+                                      left: AppSizer().height1,
+                                      right: AppSizer().height1,
+                                      top: AppSizer().height2,
                                     ),
                                     child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          "Recently Viewed",
+                                          'Top Items',
+                                          style: TextStyle(
+                                            color: AppColors.appGreen,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: AppSizer().fontSize19,
+                                          ),
+                                        ),
+                                        Container(
+                                          margin: const EdgeInsets.only(top: 0),
+                                          height: 1.5,
+                                          width: 105,
+                                          color: AppColors.appGreen,
+                                        ),
+                                        SizedBox(height: AppSizer().height2),
+                                        GridView.builder(
+                                          shrinkWrap: true,
+                                          physics:
+                                              const NeverScrollableScrollPhysics(),
+                                          itemCount: items.length,
+                                          padding: const EdgeInsets.all(0),
+                                          gridDelegate:
+                                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                                crossAxisCount: 2,
+                                                mainAxisSpacing: 6,
+                                                crossAxisSpacing: 6,
+                                                childAspectRatio: 0.70,
+                                              ),
+                                          itemBuilder: (context, index) {
+                                            final product = items[index];
+                                            final imageUrl =
+                                                product.mediaUrl.isNotEmpty
+                                                ? "https://oldmarket.bhoomi.cloud/${product.mediaUrl.first}"
+                                                : 'assets/images/placeholder.jpg';
+                                            final DateTime? createdAt =
+                                                parseDateString(
+                                                  product.createdAt,
+                                                );
+                                            return InkWell(
+                                              onTap: () {
+                                                recentlyViewedController
+                                                    .addProduct(
+                                                      RecentlyViewedModel(
+                                                        id: product.id,
+                                                        title: product.title,
+                                                        image:
+                                                            product
+                                                                .mediaUrl
+                                                                .isNotEmpty
+                                                            ? product
+                                                                  .mediaUrl
+                                                                  .first
+                                                            : '',
+                                                        price: product.price
+                                                            .toString(),
+                                                        type: 'all',
+                                                        createdAt:
+                                                            DateTime.now(),
+                                                      ),
+                                                    );
+                                                if (tokenController
+                                                    .isLoggedIn) {
+                                                  Get.toNamed(
+                                                    AppRoutes.description,
+                                                    arguments: product.id,
+                                                  );
+                                                } else {
+                                                  Get.toNamed(AppRoutes.login);
+                                                }
+                                              },
+                                              child: ProductCard(
+                                                productId: product.id,
+                                                imagePath: imageUrl,
+                                                roomInfo: product.title,
+                                                price: '₹ ${product.price}',
+                                                description:
+                                                    product.description,
+                                                location: product.location.city,
+                                                date: createdAt,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              SizedBox(height: AppSizer().height1),
+                              Padding(
+                                padding: const EdgeInsets.all(10.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Header
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          "Certified Dealers",
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.appGreen,
+                                          ),
+                                        ),
+                                        Container(
+                                          margin: const EdgeInsets.only(top: 2),
+                                          height: 1.5,
+                                          width: AppSizer().width90,
+                                          color: AppColors.appGreen,
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: AppSizer().height3),
+
+                                    // Dealer List - Full Width Carousel
+                                    SizedBox(
+                                      height: AppSizer().height30,
+                                      child: Obx(() {
+                                        if (dController
+                                            .isDealerListLoading
+                                            .value) {
+                                          return const Center(
+                                            child: CircularProgressIndicator(
+                                              color: AppColors.appGreen,
+                                            ),
+                                          );
+                                        }
+
+                                        if (dController.dealers.isEmpty) {
+                                          return Center(
+                                            child: Text(
+                                              dController
+                                                      .errorMessage
+                                                      .value
+                                                      .isEmpty
+                                                  ? "No dealers found"
+                                                  : dController
+                                                        .errorMessage
+                                                        .value,
+                                              style: const TextStyle(
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                          );
+                                        }
+
+                                        const baseUrl =
+                                            "http://oldmarket.bhoomi.cloud/";
+
+                                        return CarouselSlider.builder(
+                                          itemCount: dController.dealers.length,
+                                          options: CarouselOptions(
+                                            height: AppSizer().height30,
+                                            viewportFraction: 1.0, // Full width
+                                            autoPlay: true,
+                                            autoPlayInterval: const Duration(
+                                              seconds: 3,
+                                            ),
+                                            enlargeCenterPage: false,
+                                            enableInfiniteScroll:
+                                                dController.dealers.length > 1,
+                                          ),
+                                          itemBuilder: (context, index, realIndex) {
+                                            final dealer =
+                                                dController.dealers[index];
+
+                                            print(
+                                              "🧩 Dealer[$index] => imageUrl: ${dealer.imageUrl}, businessLogo: ${dealer.businessLogo}",
+                                            );
+
+                                            final imagePath =
+                                                dealer.imageUrl?.isNotEmpty ==
+                                                    true
+                                                ? dealer.imageUrl!
+                                                : dealer
+                                                          .businessLogo
+                                                          ?.isNotEmpty ==
+                                                      true
+                                                ? dealer.businessLogo!
+                                                : "";
+
+                                            final imageUrl =
+                                                imagePath.isNotEmpty
+                                                ? "$baseUrl$imagePath"
+                                                : "";
+
+                                            print(
+                                              "📸 Dealer[$index] => Final imageUrl used: $imageUrl",
+                                            );
+
+                                            return Container(
+                                              width: MediaQuery.of(
+                                                context,
+                                              ).size.width,
+                                              margin:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 5.0,
+                                                  ),
+                                              child: GestureDetector(
+                                                onTap: () {
+                                                  Get.to(
+                                                    () => DealerDetailScreen(
+                                                      dealerId: dealer.dealerId,
+                                                    ),
+                                                  );
+                                                },
+                                                child: Container(
+                                                  width: double.infinity,
+                                                  decoration: BoxDecoration(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors.grey
+                                                            .withOpacity(0.3),
+                                                        spreadRadius: 1,
+                                                        blurRadius: 8,
+                                                        offset: const Offset(
+                                                          0,
+                                                          3,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: Stack(
+                                                    children: [
+                                                      // Full Width Image
+                                                      Container(
+                                                        width: double.infinity,
+                                                        height:
+                                                            AppSizer().height30,
+                                                        decoration: BoxDecoration(
+                                                          color: Colors
+                                                              .grey
+                                                              .shade200,
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                12,
+                                                              ),
+                                                          image:
+                                                              imageUrl
+                                                                  .isNotEmpty
+                                                              ? DecorationImage(
+                                                                  image:
+                                                                      NetworkImage(
+                                                                        imageUrl,
+                                                                      ),
+                                                                  fit: BoxFit
+                                                                      .cover,
+                                                                )
+                                                              : null,
+                                                        ),
+                                                        child: imageUrl.isEmpty
+                                                            ? Center(
+                                                                child: Icon(
+                                                                  Icons.store,
+                                                                  size: 50,
+                                                                  color: Colors
+                                                                      .grey
+                                                                      .shade400,
+                                                                ),
+                                                              )
+                                                            : null,
+                                                      ),
+                                                      // Black overlay container with dealer name
+                                                      Positioned(
+                                                        top: 12,
+                                                        left: 12,
+                                                        child: Container(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 12,
+                                                                vertical: 6,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.black
+                                                                .withOpacity(
+                                                                  0.8,
+                                                                ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                          ),
+                                                          child: Text(
+                                                            dealer.businessName,
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontSize: 14,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  color: Colors
+                                                                      .white,
+                                                                ),
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            maxLines: 1,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      // Verified badge at bottom right
+                                                      Positioned(
+                                                        bottom: 12,
+                                                        right: 12,
+                                                        child: Container(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 4,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: AppColors
+                                                                .appGreen
+                                                                .withOpacity(
+                                                                  0.9,
+                                                                ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  12,
+                                                                ),
+                                                          ),
+                                                          child: Row(
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
+                                                            children: [
+                                                              Icon(
+                                                                Icons.verified,
+                                                                size: 14,
+                                                                color: Colors
+                                                                    .white,
+                                                              ),
+                                                              const SizedBox(
+                                                                width: 4,
+                                                              ),
+                                                              Text(
+                                                                "Certified",
+                                                                style: TextStyle(
+                                                                  fontSize: 10,
+                                                                  color: Colors
+                                                                      .white,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      }),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: AppSizer().height2),
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  left: AppSizer().height1,
+                                  right: AppSizer().height1,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "Dealer Products",
                                           style: TextStyle(
                                             color: AppColors.appGreen,
                                             fontWeight: FontWeight.w700,
@@ -979,762 +2098,151 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  SizedBox(height: AppSizer().height4),
-                                  SizedBox(
-                                    height: 130,
-                                    child: ListView.builder(
-                                      scrollDirection: Axis.horizontal,
-                                      itemCount: recentlyViewed.length,
-                                      itemBuilder: (context, index) {
-                                        final product = recentlyViewed[index];
-                                        final bool hasImage =
-                                            product.image.isNotEmpty;
-                                        final String imageUrl =
-                                            "https://oldmarket.bhoomi.cloud/${product.image}";
-
-                                        return GestureDetector(
-                                          onTap: () {
-                                            if (product.type == "dealer") {
-                                              Get.toNamed(
-                                                AppRoutes
-                                                    .dealer_product_description,
-                                                arguments: product.id,
-                                              );
-                                            } else {
-                                              Get.toNamed(
-                                                AppRoutes.description,
-                                                arguments: product.id,
-                                              );
-                                            }
-                                          },
-                                          child: Container(
-                                            width: 120,
-                                            margin: const EdgeInsets.symmetric(
-                                              horizontal: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                            ),
-                                            child: ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              child: hasImage
-                                                  ? Image.network(
-                                                      imageUrl,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder:
-                                                          (
-                                                            context,
-                                                            error,
-                                                            stackTrace,
-                                                          ) {
-                                                            return Image.asset(
-                                                              "assets/images/placeholder.jpg",
-                                                              fit: BoxFit.cover,
-                                                            );
-                                                          },
-                                                    )
-                                                  : Image.asset(
-                                                      "assets/images/placeholder.jpg",
-                                                      fit: BoxFit.cover,
-                                                    ),
-                                            ),
-                                          ),
-                                        );
+                                    InkWell(
+                                      onTap: () {
+                                        // If user logged in, navigate to dealer products screen
+                                        // otherwise send to login.
+                                        if (tokenController.isLoggedIn) {
+                                          Get.toNamed(
+                                            AppRoutes.dealer_products_screen,
+                                          );
+                                        } else {
+                                          Get.toNamed(AppRoutes.login);
+                                        }
                                       },
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }),
-                            SizedBox(height: AppSizer().height3),
-                            Padding(
-                              padding: EdgeInsets.only(
-                                left: AppSizer().height1,
-                                right: AppSizer().height1,
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Column(
-                                    children: [
-                                      Text(
-                                        "All Products.",
-                                        style: TextStyle(
-                                          color: AppColors.appGreen,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: AppSizer().fontSize19,
-                                        ),
-                                      ),
-                                      Container(
-                                        margin: const EdgeInsets.only(top: 0),
-                                        height: 1.5,
-                                        width: 105,
-                                        color: AppColors.appGreen,
-                                      ),
-                                    ],
-                                  ),
-                                  InkWell(
-                                    onTap: () {
-                                      if (tokenController.isLoggedIn) {
-                                        Get.toNamed(AppRoutes.description);
-                                      } else {
-                                        Get.toNamed(AppRoutes.login);
-                                      }
-                                    },
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          "View More",
-                                          style: TextStyle(
-                                            color: AppColors.appGreen,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: AppSizer().fontSize17,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            "View More",
+                                            style: TextStyle(
+                                              color: AppColors.appGreen,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: AppSizer().fontSize18,
+                                            ),
                                           ),
-                                        ),
-                                        Container(
-                                          margin: const EdgeInsets.only(top: 0),
-                                          height: 1.5,
-                                          width: 75,
-                                          color: AppColors.appGreen,
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                              top: 0,
+                                            ),
+                                            height: 1.5,
+                                            width: 75,
+                                            color: AppColors.appGreen,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: AppSizer().height3),
+                              Obx(() {
+                                if (homeController.isLoadingDealer.value) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
+                                  );
+                                }
+                                final dealerProducts =
+                                    homeController.dealerProducts;
+                                print(
+                                  "🏠 Home Screen - Dealer Products: ${dealerProducts.length} items",
+                                );
+
+                                if (dealerProducts.isEmpty) {
+                                  return Center(
+                                    child: Column(
+                                      children: [
+                                        const Text("No dealer products found"),
+                                        SizedBox(height: 8),
+                                        ElevatedButton(
+                                          onPressed: () => homeController
+                                              .fetchDealerProducts(),
+                                          child: const Text("Retry"),
                                         ),
                                       ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(height: AppSizer().height3),
-                            Obx(() {
-                              if (productController.isLoading.value) {
-                                return const Center(
-                                  child: CircularProgressIndicator(),
-                                );
-                              }
-                              final limitedProducts = productController
-                                  .productList
-                                  .take(8)
-                                  .toList();
-                              return GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: limitedProducts.length,
-                                padding: const EdgeInsets.all(6),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 2,
-                                      mainAxisSpacing: 5,
-                                      crossAxisSpacing: 2,
-                                      childAspectRatio: 0.70,
-                                    ),
-                                itemBuilder: (context, index) {
-                                  final product = limitedProducts[index];
-                                  final String imageUrl =
-                                      product.mediaUrl.isNotEmpty
-                                      ? "https://oldmarket.bhoomi.cloud/${product.mediaUrl.first}"
-                                      : 'assets/images/placeholder.jpg';
-                                  // wishlist usage intentionally omitted here
-                                  return InkWell(
-                                    onTap: () {
-                                      recentlyViewedController.addProduct(
-                                        RecentlyViewedModel(
-                                          id: product.id,
-                                          title: product.title,
-                                          image: product.mediaUrl.isNotEmpty
-                                              ? product.mediaUrl.first
-                                              : "",
-                                          price: product.price.toString(),
-                                          type: "all",
-                                          createdAt: DateTime.now(),
-                                        ),
-                                      );
-                                      if (tokenController.isLoggedIn) {
-                                        Get.toNamed(
-                                          AppRoutes.description,
-                                          arguments: product.id,
-                                        );
-                                      } else {
-                                        Get.toNamed(AppRoutes.login);
-                                      }
-                                    },
-                                    child: ProductCard(
-                                      productId: product.id,
-                                      imagePath: imageUrl,
-                                      roomInfo: product.title,
-                                      price: "₹ ${product.price}",
-                                      description: product.description,
-                                      location: product.location.city,
-                                      date: parseDateString(product.createdAt),
                                     ),
                                   );
-                                },
-                              );
-                            }),
-                            SizedBox(height: AppSizer().height2),
-                            Obx(() {
-                              print(
-                                "Suggested Videos Length: ${shortVideoController.suggestedVideos.length}",
-                              );
+                                }
+                                // 🎲 Use randomized dealer products for variety
+                                final limitedProducts = homeController
+                                    .getRandomDealerProducts(limit: 8);
 
-                              if (shortVideoController.isLoadingVideos.value) {
-                                return const Center(
-                                  child: CircularProgressIndicator(),
+                                print(
+                                  '[HomeScreen] 🏪 Displaying ${limitedProducts.length} randomized dealer products',
                                 );
-                              }
-
-                              if (shortVideoController
-                                  .suggestedVideos
-                                  .isEmpty) {
-                                return const SizedBox.shrink();
-                              }
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Section title
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: AppSizer().height1,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          "Suggested Videos",
-                                          style: TextStyle(
-                                            color: AppColors.appGreen,
-                                            fontSize: AppSizer().fontSize19,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        Container(
-                                          margin: const EdgeInsets.only(top: 4),
-                                          height: 1.5,
-                                          width: 145,
-                                          color: AppColors.appGreen,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  SizedBox(height: AppSizer().height2),
-
-                                  // Horizontal video list - only the centered item will
-                                  // show an autoplaying, muted VideoPlayerWidget. Others
-                                  // show static thumbnails to conserve resources.
-                                  SizedBox(
-                                    height: AppSizer().height12 * 2.5,
-                                    child: ListView.builder(
-                                      controller: _suggestedScrollController,
-                                      scrollDirection: Axis.horizontal,
-                                      itemCount: shortVideoController
-                                          .suggestedVideos
-                                          .length,
-                                      itemBuilder: (context, index) {
-                                        final video = shortVideoController
-                                            .suggestedVideos[index];
-
-                                        final thumbPath =
-                                            video.thumbnailUrl.isNotEmpty
-                                            ? _fullVideoUrl(video.thumbnailUrl)
-                                            : (video.videoUrl.isNotEmpty
-                                                  ? _fullVideoUrl(
-                                                      video.videoUrl,
-                                                    )
-                                                  : '');
-
-                                        // previously used to show only one active preview
-
-                                        return GestureDetector(
-                                          onTap: () {
-                                            final vid = shortVideoController
-                                                .suggestedVideos[index]
-                                                .id;
-                                            print(
-                                              '[HomeScreen] Tapped suggested video id: $vid',
-                                            );
-                                            Get.toNamed(
-                                              AppRoutes.shortVideo,
-                                              arguments: {
-                                                'videos': shortVideoController
-                                                    .suggestedVideos,
-                                                'currentIndex': index,
-                                                'id': vid,
-                                              },
-                                            );
-                                          },
-                                          child: Container(
-                                            width: 150,
-                                            margin: const EdgeInsets.all(8),
-                                            decoration: BoxDecoration(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              color: Colors.black12,
-                                            ),
-                                            child: ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              child: SizedBox(
-                                                width: 150,
-                                                height: double.infinity,
-                                                child: thumbPath.isNotEmpty
-                                                    ? VideoPlayerWidget(
-                                                        videoUrl: _fullVideoUrl(
-                                                          video.videoUrl,
-                                                        ),
-                                                        muted: true,
-                                                        enableTapToToggle:
-                                                            false,
-                                                      )
-                                                    : Image.asset(
-                                                        'assets/images/placeholder.jpg',
-                                                        fit: BoxFit.cover,
-                                                      ),
-                                              ),
-                                            ),
+                                return GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: limitedProducts.length,
+                                  padding: const EdgeInsets.all(6),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 2,
+                                        mainAxisSpacing: 5,
+                                        crossAxisSpacing: 2,
+                                        childAspectRatio: 0.70,
+                                      ),
+                                  itemBuilder: (context, index) {
+                                    final product = limitedProducts[index];
+                                    final String imageUrl =
+                                        (product.images.isNotEmpty)
+                                        ? "https://oldmarket.bhoomi.cloud/${product.images.first}"
+                                        : 'assets/images/placeholder.jpg';
+                                    final String city =
+                                        product.location ?? "Unknown";
+                                    final String title = product.title;
+                                    final String description =
+                                        product.description;
+                                    final String price = "₹ ${product.price}";
+                                    final DateTime? createdAt =
+                                        product.createdAt;
+                                    return InkWell(
+                                      onTap: () {
+                                        recentlyViewedController.addProduct(
+                                          RecentlyViewedModel(
+                                            id: product.id,
+                                            title: product.title,
+                                            image: product.images.isNotEmpty
+                                                ? product.images.first
+                                                : "",
+                                            price: product.price.toString(),
+                                            type: "dealer",
+                                            createdAt: DateTime.now(),
                                           ),
                                         );
+                                        if (tokenController.isLoggedIn) {
+                                          Get.toNamed(
+                                            AppRoutes
+                                                .dealer_product_description,
+                                            arguments: product.id,
+                                          );
+                                        } else {
+                                          Get.toNamed(AppRoutes.login);
+                                        }
                                       },
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }),
-                            // --- Top Items (User's products) - inserted after Certified Dealers ---
-                            FutureBuilder<List<AllProductModel>>(
-                              future: _fetchTopItems(limit: 4),
-                              builder: (context, snap) {
-                                if (snap.connectionState ==
-                                    ConnectionState.waiting)
-                                  return const SizedBox.shrink();
-                                final items = snap.data ?? [];
-                                if (items.isEmpty)
-                                  return const SizedBox.shrink();
-                                return Padding(
-                                  padding: EdgeInsets.only(
-                                    left: AppSizer().height1,
-                                    right: AppSizer().height1,
-                                    top: AppSizer().height2,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Top Items',
-                                        style: TextStyle(
-                                          color: AppColors.appGreen,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: AppSizer().fontSize19,
-                                        ),
+                                      child: ProductCard(
+                                        imagePath: imageUrl,
+                                        roomInfo: title,
+                                        price: price,
+                                        description: description,
+                                        location: city,
+                                        date: createdAt,
+                                        productId: product.id,
+                                        isDealer: true,
                                       ),
-                                      Container(
-                                        margin: const EdgeInsets.only(top: 0),
-                                        height: 1.5,
-                                        width: 105,
-                                        color: AppColors.appGreen,
-                                      ),
-                                      SizedBox(height: AppSizer().height2),
-                                      GridView.builder(
-                                        shrinkWrap: true,
-                                        physics:
-                                            const NeverScrollableScrollPhysics(),
-                                        itemCount: items.length,
-                                        padding: const EdgeInsets.all(0),
-                                        gridDelegate:
-                                            const SliverGridDelegateWithFixedCrossAxisCount(
-                                              crossAxisCount: 2,
-                                              mainAxisSpacing: 6,
-                                              crossAxisSpacing: 6,
-                                              childAspectRatio: 0.70,
-                                            ),
-                                        itemBuilder: (context, index) {
-                                          final product = items[index];
-                                          final imageUrl =
-                                              product.mediaUrl.isNotEmpty
-                                              ? "https://oldmarket.bhoomi.cloud/${product.mediaUrl.first}"
-                                              : 'assets/images/placeholder.jpg';
-                                          final DateTime? createdAt =
-                                              parseDateString(
-                                                product.createdAt,
-                                              );
-                                          return InkWell(
-                                            onTap: () {
-                                              recentlyViewedController
-                                                  .addProduct(
-                                                    RecentlyViewedModel(
-                                                      id: product.id,
-                                                      title: product.title,
-                                                      image:
-                                                          product
-                                                              .mediaUrl
-                                                              .isNotEmpty
-                                                          ? product
-                                                                .mediaUrl
-                                                                .first
-                                                          : '',
-                                                      price: product.price
-                                                          .toString(),
-                                                      type: 'all',
-                                                      createdAt: DateTime.now(),
-                                                    ),
-                                                  );
-                                              if (tokenController.isLoggedIn) {
-                                                Get.toNamed(
-                                                  AppRoutes.description,
-                                                  arguments: product.id,
-                                                );
-                                              } else {
-                                                Get.toNamed(AppRoutes.login);
-                                              }
-                                            },
-                                            child: ProductCard(
-                                              productId: product.id,
-                                              imagePath: imageUrl,
-                                              roomInfo: product.title,
-                                              price: '₹ ${product.price}',
-                                              description: product.description,
-                                              location: product.location.city,
-                                              date: createdAt,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
+                                    );
+                                  },
                                 );
-                              },
-                            ),
-
-                            SizedBox(height: AppSizer().height1),
-                            Padding(
-                              padding: const EdgeInsets.all(10.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Header
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        "Certified Dealers",
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.appGreen,
-                                        ),
-                                      ),
-                                      Container(
-                                        margin: const EdgeInsets.only(top: 2),
-                                        height: 1.5,
-                                        width: 140,
-                                        color: AppColors.appGreen,
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: AppSizer().height3),
-
-                                  // Dealer List
-                                  SizedBox(
-                                    height: AppSizer().height30,
-                                    child: Obx(() {
-                                      if (dController
-                                          .isDealerListLoading
-                                          .value) {
-                                        return const Center(
-                                          child: CircularProgressIndicator(
-                                            color: AppColors.appGreen,
-                                          ),
-                                        );
-                                      }
-
-                                      if (dController.dealers.isEmpty) {
-                                        return Center(
-                                          child: Text(
-                                            dController
-                                                    .errorMessage
-                                                    .value
-                                                    .isEmpty
-                                                ? "No dealers found"
-                                                : dController
-                                                      .errorMessage
-                                                      .value,
-                                            style: const TextStyle(
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                        );
-                                      }
-
-                                      const baseUrl =
-                                          "http://oldmarket.bhoomi.cloud/";
-
-                                      return ListView.separated(
-                                        scrollDirection: Axis.horizontal,
-                                        itemCount: dController.dealers.length,
-                                        separatorBuilder: (_, __) =>
-                                            const SizedBox(width: 15),
-                                        itemBuilder: (context, index) {
-                                          final dealer =
-                                              dController.dealers[index];
-
-                                          print(
-                                            "🧩 Dealer[$index] => imageUrl: ${dealer.imageUrl}, businessLogo: ${dealer.businessLogo}",
-                                          );
-
-                                          final imagePath =
-                                              dealer.imageUrl?.isNotEmpty ==
-                                                  true
-                                              ? dealer.imageUrl!
-                                              : dealer
-                                                        .businessLogo
-                                                        ?.isNotEmpty ==
-                                                    true
-                                              ? dealer.businessLogo!
-                                              : "";
-
-                                          final imageUrl = imagePath.isNotEmpty
-                                              ? "$baseUrl$imagePath"
-                                              : "";
-
-                                          print(
-                                            "📸 Dealer[$index] => Final imageUrl used: $imageUrl",
-                                          );
-
-                                          return GestureDetector(
-                                            onTap: () {
-                                              Get.to(
-                                                () => DealerDetailScreen(
-                                                  dealerId: dealer.dealerId,
-                                                ),
-                                              );
-                                            },
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Container(
-                                                  width: AppSizer().width43,
-                                                  height: AppSizer().height25,
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.grey.shade200,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
-                                                    image: imageUrl.isNotEmpty
-                                                        ? DecorationImage(
-                                                            image: NetworkImage(
-                                                              imageUrl,
-                                                            ),
-                                                            fit: BoxFit.cover,
-                                                          )
-                                                        : null,
-                                                  ),
-                                                  child: imageUrl.isEmpty
-                                                      ? const Icon(
-                                                          Icons.person,
-                                                          size: 30,
-                                                          color: Colors.grey,
-                                                        )
-                                                      : null,
-                                                ),
-                                                const SizedBox(height: 6),
-                                                SizedBox(
-                                                  width: 100,
-                                                  child: Text(
-                                                    dealer.businessName,
-                                                    style: const TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                      color: Colors.black87,
-                                                    ),
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    textAlign: TextAlign.center,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    }),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(height: AppSizer().height2),
-                            Padding(
-                              padding: EdgeInsets.only(
-                                left: AppSizer().height1,
-                                right: AppSizer().height1,
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        "Dealer Products",
-                                        style: TextStyle(
-                                          color: AppColors.appGreen,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: AppSizer().fontSize19,
-                                        ),
-                                      ),
-                                      Container(
-                                        margin: const EdgeInsets.only(top: 0),
-                                        height: 1.5,
-                                        width: 140,
-                                        color: AppColors.appGreen,
-                                      ),
-                                    ],
-                                  ),
-                                  InkWell(
-                                    onTap: () {
-                                      // If user logged in, navigate to dealer products screen
-                                      // otherwise send to login.
-                                      if (tokenController.isLoggedIn) {
-                                        Get.toNamed(
-                                          AppRoutes.dealer_products_screen,
-                                        );
-                                      } else {
-                                        Get.toNamed(AppRoutes.login);
-                                      }
-                                    },
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          "View More",
-                                          style: TextStyle(
-                                            color: AppColors.appGreen,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: AppSizer().fontSize18,
-                                          ),
-                                        ),
-                                        Container(
-                                          margin: const EdgeInsets.only(top: 0),
-                                          height: 1.5,
-                                          width: 75,
-                                          color: AppColors.appGreen,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(height: AppSizer().height3),
-                            Obx(() {
-                              if (homeController.isLoadingDealer.value) {
-                                return const Center(
-                                  child: CircularProgressIndicator(),
-                                );
-                              }
-                              final List<dynamic> dealerProducts =
-                                  homeController.dealerProducts;
-                              if (dealerProducts.isEmpty) {
-                                return const Center(
-                                  child: Text("No products uploaded yet"),
-                                );
-                              }
-                              final limitedProducts = dealerProducts
-                                  .take(8)
-                                  .toList();
-                              return GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: limitedProducts.length,
-                                padding: const EdgeInsets.all(6),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 2,
-                                      mainAxisSpacing: 5,
-                                      crossAxisSpacing: 2,
-                                      childAspectRatio: 0.70,
-                                    ),
-                                itemBuilder: (context, index) {
-                                  final product = limitedProducts[index];
-                                  final String imageUrl =
-                                      (product.images.isNotEmpty)
-                                      ? "https://oldmarket.bhoomi.cloud/${product.images.first}"
-                                      : 'assets/images/placeholder.jpg';
-                                  final String city =
-                                      product.location != null &&
-                                          product.location is Map
-                                      ? product.location['city'] ?? "Unknown"
-                                      : "Unknown";
-                                  final String title =
-                                      product.title ?? "No Title";
-                                  final String description =
-                                      product.description ?? "";
-                                  final String price =
-                                      "₹ ${product.price ?? '0'}";
-
-                                  final DateTime? createdAt =
-                                      product.createdAt is String
-                                      ? parseDateString(product.createdAt)
-                                      : (product.createdAt is DateTime
-                                            ? product.createdAt
-                                            : null);
-                                  return InkWell(
-                                    onTap: () {
-                                      recentlyViewedController.addProduct(
-                                        RecentlyViewedModel(
-                                          id: product.id,
-                                          title: product.title,
-                                          image: product.images.isNotEmpty
-                                              ? product.images.first
-                                              : "",
-                                          price: product.price.toString(),
-                                          type: "dealer",
-                                          createdAt: DateTime.now(),
-                                        ),
-                                      );
-                                      if (tokenController.isLoggedIn) {
-                                        Get.toNamed(
-                                          AppRoutes.dealer_product_description,
-                                          arguments: product.id,
-                                        );
-                                      } else {
-                                        Get.toNamed(AppRoutes.login);
-                                      }
-                                    },
-                                    child: ProductCard(
-                                      imagePath: imageUrl,
-                                      roomInfo: title,
-                                      price: price,
-                                      description: description,
-                                      location: city,
-                                      date: createdAt,
-                                      productId: product.id,
-                                      isDealer: true,
-                                    ),
-                                  );
-                                },
-                              );
-                            }),
-                            SizedBox(height: AppSizer().height2),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
+                              }),
+                              SizedBox(height: AppSizer().height2),
+                            ],
+                          ),
+                        ], // Column children
+                      ), // Column
+                    ), // SingleChildScrollView
+                  ), // RefreshIndicator
+                ); // SafeArea
               case 1:
                 return CategoryScreen();
               case 2:
@@ -1780,6 +2288,26 @@ class _HomeScreenState extends State<HomeScreen> {
           }),
         ),
       );
+    });
+  }
+
+  /// 🔥 Check if we need to open drawer based on navigation arguments
+  void _checkDrawerArguments() {
+    // Check for openDrawer argument from navigation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final arguments = Get.arguments;
+      if (arguments != null && 
+          arguments is Map<String, dynamic> && 
+          arguments['openDrawer'] == true) {
+        print('🔥 [HomeScreen] Opening drawer due to navigation argument');
+        // Open drawer after a small delay to ensure scaffold is built
+        Future.delayed(Duration(milliseconds: 500), () {
+          if (_scaffoldKey.currentState != null && mounted) {
+            _scaffoldKey.currentState!.openDrawer();
+            print('✅ [HomeScreen] Drawer opened successfully');
+          }
+        });
+      }
     });
   }
 }

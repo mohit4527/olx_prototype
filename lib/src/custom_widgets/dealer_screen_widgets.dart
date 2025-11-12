@@ -8,7 +8,9 @@ class AppCustomWidgets {
   static Widget sectionTitle(String title) {
     return Padding(
       padding: EdgeInsets.only(
-          top: AppSizer().height2, bottom: AppSizer().height1),
+        top: AppSizer().height2,
+        bottom: AppSizer().height1,
+      ),
       child: Text(
         title,
         style: TextStyle(
@@ -21,13 +23,13 @@ class AppCustomWidgets {
 
   /// ------- Text Field with Controller + Validation + InputFormatter ------
   static Widget buildTextField(
-      String hint,
-      Icon icon, {
-        TextEditingController? controller,
-        String? Function(String?)? validator,
-        TextInputType keyboardType = TextInputType.text,
-        List<TextInputFormatter>? inputFormatters, // <-- NEW
-      }) {
+    String hint,
+    Icon icon, {
+    TextEditingController? controller,
+    String? Function(String?)? validator,
+    TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters, // <-- NEW
+  }) {
     return Padding(
       padding: EdgeInsets.only(bottom: AppSizer().height1),
       child: TextFormField(
@@ -53,8 +55,12 @@ class AppCustomWidgets {
   }
 
   /// ------ Dropdown ------
-  static Widget buildDropdown(String hint, List<String> items,
-      {String? value, void Function(String?)? onChanged}) {
+  static Widget buildDropdown(
+    String hint,
+    List<String> items, {
+    String? value,
+    void Function(String?)? onChanged,
+  }) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: AppSizer().width2),
       decoration: BoxDecoration(
@@ -67,10 +73,7 @@ class AppCustomWidgets {
           value: value,
           iconEnabledColor: AppColors.appGreen,
           items: items
-              .map((e) => DropdownMenuItem(
-            value: e,
-            child: Text(e),
-          ))
+              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
               .toList(),
           onChanged: onChanged,
         ),
@@ -80,10 +83,11 @@ class AppCustomWidgets {
 
   /// ------ Text Area with Controller ------
   static Widget buildTextArea(
-      String hint, {
-        TextEditingController? controller,
-        String? Function(String?)? validator,
-      }) {
+    String hint, {
+    TextEditingController? controller,
+    String? Function(String?)? validator,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
     return Container(
       padding: EdgeInsets.all(AppSizer().width2),
       decoration: BoxDecoration(
@@ -93,6 +97,7 @@ class AppCustomWidgets {
       child: TextFormField(
         controller: controller,
         validator: validator,
+        inputFormatters: inputFormatters,
         maxLines: 4,
         decoration: InputDecoration.collapsed(hintText: hint),
       ),
@@ -101,10 +106,10 @@ class AppCustomWidgets {
 
   ///------- Chip ------
   static Widget buildChip(
-      String label, {
-        bool isSelected = false,
-        required BuildContext context,
-      }) {
+    String label, {
+    bool isSelected = false,
+    required BuildContext context,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -130,6 +135,7 @@ class AppCustomWidgets {
       ),
     );
   }
+
   /// -------- Image Upload Box --------
   static Widget buildImageUploadBox() {
     return Container(

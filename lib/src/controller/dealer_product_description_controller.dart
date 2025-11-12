@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
-// removed unused imports
 import 'package:url_launcher/url_launcher.dart';
 
 import '../model/dealer_product_model/dealer_product_model.dart';
@@ -11,8 +10,16 @@ import 'dealer_wishlist_controller.dart';
 class DealerDescriptionController extends GetxController {
   final ApiService _apiService = ApiService();
   final String productId;
+  final String? passedPhoneNumber;
+  final String? passedDealerName;
+  final String? passedSellerType;
 
-  DealerDescriptionController({required this.productId});
+  DealerDescriptionController({
+    required this.productId,
+    this.passedPhoneNumber,
+    this.passedDealerName,
+    this.passedSellerType,
+  });
 
   // Reactive variables
   var productData = Rx<Data?>(null);
@@ -33,7 +40,11 @@ class DealerDescriptionController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    print('Received Product ID: $productId');
+    print('[DealerDescriptionController] 🔧 Initializing with:');
+    print('  - Product ID: $productId');
+    print('  - Passed Phone: $passedPhoneNumber');
+    print('  - Passed Dealer Name: $passedDealerName');
+    print('  - Passed Seller Type: $passedSellerType');
     fetchProductDetails();
   }
 
@@ -41,172 +52,237 @@ class DealerDescriptionController extends GetxController {
   Future<void> fetchProductDetails() async {
     try {
       isLoading.value = true;
+      print(
+        '[DealerDescriptionController] 📡 Fetching product details for ID: $productId',
+      );
       final response = await _apiService.fetchDealerProductById(productId);
       if (response != null && response.data != null) {
         productData.value = response.data;
+        print(
+          '[DealerDescriptionController] ✅ Product data loaded: ${response.data?.title}',
+        );
+        print(
+          '[DealerDescriptionController] 📞 Product phone: "${response.data?.phone}"',
+        );
+        print(
+          '[DealerDescriptionController] 🆔 Product dealerId: "${response.data?.dealerId}"',
+        );
+      } else {
+        print('[DealerDescriptionController] ❌ No product data received');
       }
     } catch (e) {
+      print('[DealerDescriptionController] 💥 Error fetching product: $e');
       Get.snackbar("Error", "Failed to load product details");
     } finally {
       isLoading.value = false;
     }
   }
 
-  ///  Call dealer
-  /// Call dealer dynamically
+  /// Enhanced Call dealer with comprehensive phone resolution
   Future<void> callDealer() async {
-    String phoneNumber = productData.value?.phone ?? ""; // 🔹 dynamic phone
-    if (phoneNumber.isEmpty) {
-      // Try dealer stats endpoint for contact fallback
-      try {
-        final dealerId = productData.value?.dealerId ?? '';
-        if (dealerId.isNotEmpty) {
-          final stats = await ApiService.getDealerStats(dealerId);
-          final contact =
-              stats?['phone'] ?? stats?['contact'] ?? stats?['data']?['phone'];
-          if (contact != null) phoneNumber = contact.toString();
-        }
-      } catch (e) {
-        print('[DealerDescriptionController] dealer stats fetch error: $e');
-      }
+    print('[DealerDescriptionController] 🔥 callDealer() called');
 
-      if (phoneNumber.isEmpty) {
-        Get.snackbar(
-          "Error",
-          "Dealer phone not available.",
-          backgroundColor: AppColors.appRed,
-          colorText: AppColors.appWhite,
-        );
-        return;
-      }
+    final product = productData.value;
+    if (product == null) {
+      _showNoPhoneError();
+      return;
     }
 
+    print('[DealerDescriptionController] 📋 Product data available');
+    print('[DealerDescriptionController] 🔍 Phone sources check:');
+    print('  - product.phone: "${product.phone}"');
+    print('  - product.dealerPhone: "${product.dealerPhone}"');
+    print('  - product.dealerId: "${product.dealerId}"');
+
+    // 🔍 Try to get phone number from multiple sources with priority
+    String? phoneNumber = _resolvePhoneNumber(product);
+
+    if (phoneNumber != null && phoneNumber.isNotEmpty) {
+      print(
+        '[DealerDescriptionController] ✅ Using resolved phone: $phoneNumber',
+      );
+      await _directCall(phoneNumber);
+      return;
+    }
+
+    // If no phone found, show user-friendly error
+    print('[DealerDescriptionController] ❌ No phone number resolved');
+    _showNoPhoneError();
+  }
+
+  /// Comprehensive phone number resolution for dealer products
+  String? _resolvePhoneNumber(Data product) {
+    // Priority 1: Phone number passed from dealer products list screen (most reliable)
+    if (passedPhoneNumber != null && passedPhoneNumber!.trim().isNotEmpty) {
+      print(
+        '[DealerDescriptionController] ✅ Using passed phone: $passedPhoneNumber',
+      );
+      return passedPhoneNumber!.trim();
+    }
+
+    // Priority 2: Enhanced phone from model (includes dealerPhone, dealerId.phone, etc.)
+    if (product.phone != null && product.phone!.trim().isNotEmpty) {
+      print(
+        '[DealerDescriptionController] ✅ Using model phone: ${product.phone}',
+      );
+      return product.phone!.trim();
+    }
+
+    // Priority 3: Direct dealerPhone field
+    if (product.dealerPhone != null && product.dealerPhone!.trim().isNotEmpty) {
+      print(
+        '[DealerDescriptionController] ✅ Using dealerPhone: ${product.dealerPhone}',
+      );
+      return product.dealerPhone!.trim();
+    }
+
+    print('[DealerDescriptionController] ❌ No phone number found');
+    return null;
+  }
+
+  /// Show user-friendly no phone error
+  void _showNoPhoneError() {
+    Get.snackbar(
+      "📞 Call Not Available",
+      "Contact information is not available for this product",
+      backgroundColor: Colors.orange.shade600,
+      colorText: Colors.white,
+      icon: const Icon(Icons.phone_disabled, color: Colors.white),
+      duration: const Duration(seconds: 3),
+    );
+  }
+
+  /// Enhanced WhatsApp dealer with comprehensive phone resolution
+  Future<void> whatsappDealer() async {
+    print('[DealerDescriptionController] � whatsappDealer() called');
+
+    final product = productData.value;
+    if (product == null) {
+      _showNoWhatsAppError();
+      return;
+    }
+
+    // 🔍 Try to get phone number from multiple sources
+    String? phoneNumber = _resolvePhoneNumber(product);
+
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      print('[DealerDescriptionController] ❌ No WhatsApp number resolved');
+      _showNoWhatsAppError();
+      return;
+    }
+
+    print(
+      '[DealerDescriptionController] ✅ Using WhatsApp number: $phoneNumber',
+    );
+
+    // Create enhanced message for dealer products
+    String message = _createDealerWhatsAppMessage(product);
+
     try {
-      final cleaned = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-      if (cleaned.isEmpty) {
-        Get.snackbar(
-          "Error",
-          "Dealer phone not available.",
-          backgroundColor: AppColors.appRed,
-          colorText: AppColors.appWhite,
-        );
-        return;
-      }
-
-      String dialNumber = cleaned;
-      if (cleaned.length == 10) {
-        dialNumber = '+91$cleaned';
-      } else if (cleaned.startsWith('0')) {
-        final stripped = cleaned.replaceFirst(RegExp(r'^0+'), '');
-        if (stripped.length == 10) dialNumber = '+91$stripped';
-      } else if (!cleaned.startsWith('+') && cleaned.length > 10) {
-        dialNumber = '+$cleaned';
-      }
-
-      final uri = Uri(scheme: 'tel', path: dialNumber);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        Get.snackbar(
-          "Error",
-          "Could not launch call functionality.",
-          backgroundColor: AppColors.appRed,
-          colorText: AppColors.appWhite,
-        );
+      final success = await _launchWhatsApp(phoneNumber, message);
+      if (!success) {
+        _showWhatsAppLaunchError();
       }
     } catch (e) {
-      Get.snackbar(
-        "Error",
-        "Something went wrong: $e",
-        backgroundColor: AppColors.appRed,
-        colorText: AppColors.appWhite,
-      );
+      print('[DealerDescriptionController] WhatsApp error: $e');
+      _showWhatsAppLaunchError();
     }
   }
 
-  /// WhatsApp dealer dynamically
-  Future<void> whatsappDealer() async {
-    String phoneNumber = productData.value?.phone ?? ""; // 🔹 dynamic phone
-    if (phoneNumber.isEmpty) {
-      try {
-        final dealerId = productData.value?.dealerId ?? '';
-        if (dealerId.isNotEmpty) {
-          final stats = await ApiService.getDealerStats(dealerId);
-          final contact =
-              stats?['whatsapp'] ??
-              stats?['contact'] ??
-              stats?['data']?['whatsapp'];
-          if (contact != null) phoneNumber = contact.toString();
-        }
-      } catch (e) {
-        print('[DealerDescriptionController] dealer stats fetch error: $e');
-      }
+  /// Create enhanced WhatsApp message for dealer products
+  String _createDealerWhatsAppMessage(Data product) {
+    String message = "Hi! 👋 I'm interested in this vehicle:\n\n";
+    message += "🚗 *${product.title ?? 'Vehicle'}*\n";
 
-      if (phoneNumber.isEmpty) {
-        Get.snackbar(
-          "Error",
-          "Dealer WhatsApp not available.",
-          backgroundColor: AppColors.appRed,
-          colorText: AppColors.appWhite,
-        );
-        return;
-      }
+    if (product.price != null) {
+      message += "💰 Price: *₹${product.price}*\n";
     }
 
-    final message =
-        'Hi, I am interested in this vehicle: ${productData.value?.title ?? ''} - http://oldmarket.bhoomi.cloud/dealer/${productData.value?.id ?? ''}';
-
-    try {
-      final cleaned = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-      if (cleaned.isEmpty) {
-        Get.snackbar(
-          "Error",
-          "Dealer WhatsApp not available.",
-          backgroundColor: AppColors.appRed,
-          colorText: AppColors.appWhite,
-        );
-        return;
-      }
-
-      String waNumber = cleaned;
-      if (cleaned.length == 10) {
-        waNumber = '91$cleaned';
-      } else if (cleaned.startsWith('0')) {
-        final stripped = cleaned.replaceFirst(RegExp(r'^0+'), '');
-        if (stripped.length == 10) waNumber = '91$stripped';
-      } else if (cleaned.startsWith('+')) {
-        waNumber = cleaned.replaceFirst('+', '');
-      }
-
-      final encoded = Uri.encodeComponent(message);
-      final uriApp = Uri.parse('whatsapp://send?phone=$waNumber&text=$encoded');
-      if (await canLaunchUrl(uriApp)) {
-        await launchUrl(uriApp, mode: LaunchMode.externalApplication);
-        return;
-      }
-
-      final uriWeb = Uri.parse(
-        'https://api.whatsapp.com/send?phone=$waNumber&text=$encoded',
-      );
-      if (await canLaunchUrl(uriWeb)) {
-        await launchUrl(uriWeb, mode: LaunchMode.externalApplication);
-        return;
-      }
-
-      Get.snackbar(
-        "Error",
-        "Could not launch WhatsApp.",
-        backgroundColor: AppColors.appRed,
-        colorText: AppColors.appWhite,
-      );
-    } catch (e) {
-      Get.snackbar(
-        "Error",
-        "Something went wrong: $e",
-        backgroundColor: AppColors.appRed,
-        colorText: AppColors.appWhite,
-      );
+    // Use passed dealer name first, then fallback to product data
+    final dealerName = passedDealerName ?? product.dealerName;
+    if (dealerName != null && dealerName.isNotEmpty) {
+      message += "🏪 Dealer: *$dealerName*\n";
     }
+
+    if (product.dealerBusinessName != null &&
+        product.dealerBusinessName!.isNotEmpty) {
+      message += "🏢 Business: *${product.dealerBusinessName}*\n";
+    }
+
+    message +=
+        "\n🔗 View details: https://oldmarket.bhoomi.cloud/app/dealer/${product.id ?? ''}\n";
+    message += "\n📱 Download Old Market app for complete details!";
+
+    return message;
+  }
+
+  /// Launch WhatsApp with enhanced error handling
+  Future<bool> _launchWhatsApp(String phoneNumber, String message) async {
+    final cleaned = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleaned.isEmpty) return false;
+
+    String waNumber = cleaned;
+    if (cleaned.length == 10) {
+      waNumber = '91$cleaned';
+    } else if (cleaned.startsWith('0')) {
+      final stripped = cleaned.replaceFirst(RegExp(r'^0+'), '');
+      if (stripped.length == 10) waNumber = '91$stripped';
+    } else if (cleaned.startsWith('+')) {
+      waNumber = cleaned.replaceFirst('+', '');
+    }
+
+    final encoded = Uri.encodeComponent(message);
+
+    // Try WhatsApp app first
+    final uriApp = Uri.parse('whatsapp://send?phone=$waNumber&text=$encoded');
+    if (await canLaunchUrl(uriApp)) {
+      await launchUrl(uriApp, mode: LaunchMode.externalApplication);
+
+      Get.snackbar(
+        "💬 Opening WhatsApp",
+        "Starting conversation with dealer...",
+        backgroundColor: Colors.green.shade600,
+        colorText: Colors.white,
+        icon: const Icon(Icons.message, color: Colors.white),
+        duration: const Duration(seconds: 2),
+      );
+      return true;
+    }
+
+    // Fallback to web WhatsApp
+    final uriWeb = Uri.parse(
+      'https://api.whatsapp.com/send?phone=$waNumber&text=$encoded',
+    );
+    if (await canLaunchUrl(uriWeb)) {
+      await launchUrl(uriWeb, mode: LaunchMode.externalApplication);
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Show user-friendly no WhatsApp error
+  void _showNoWhatsAppError() {
+    Get.snackbar(
+      "💬 WhatsApp Not Available",
+      "WhatsApp contact is not available for this dealer",
+      backgroundColor: Colors.orange.shade600,
+      colorText: Colors.white,
+      icon: const Icon(Icons.message_outlined, color: Colors.white),
+      duration: const Duration(seconds: 3),
+    );
+  }
+
+  /// Show WhatsApp launch error
+  void _showWhatsAppLaunchError() {
+    Get.snackbar(
+      "❌ WhatsApp Error",
+      "Could not open WhatsApp. Please check if it's installed.",
+      backgroundColor: Colors.red.shade600,
+      colorText: Colors.white,
+      icon: const Icon(Icons.error_outline, color: Colors.white),
+      duration: const Duration(seconds: 3),
+    );
   }
 
   /// Carousel index
@@ -464,5 +540,64 @@ class DealerDescriptionController extends GetxController {
         ),
       ),
     );
+  }
+
+  /// Direct call method for API phone numbers
+  Future<void> _directCall(String phoneNumber) async {
+    try {
+      print(
+        "📞 [DealerDescriptionController] Making direct call to: $phoneNumber",
+      );
+
+      final cleaned = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      if (cleaned.isEmpty) {
+        Get.snackbar(
+          "📞 Call Error",
+          "Invalid phone number format",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      String dialNumber = cleaned;
+      if (cleaned.length == 10) {
+        dialNumber = '+91$cleaned';
+      } else if (cleaned.startsWith('0')) {
+        final stripped = cleaned.replaceFirst(RegExp(r'^0+'), '');
+        if (stripped.length == 10) dialNumber = '+91$stripped';
+      } else if (!cleaned.startsWith('+') && cleaned.length > 10) {
+        dialNumber = '+$cleaned';
+      }
+
+      final uri = Uri(scheme: 'tel', path: dialNumber);
+
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        Get.snackbar(
+          "📞 Calling Dealer",
+          "Dialing $phoneNumber...",
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          icon: const Icon(Icons.phone, color: Colors.white),
+          duration: const Duration(seconds: 2),
+        );
+      } else {
+        Get.snackbar(
+          "❌ Call Failed",
+          "Cannot make phone calls on this device",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      print("❌ [DealerDescriptionController] Direct call error: $e");
+      Get.snackbar(
+        "❌ Call Error",
+        "Failed to make call: $e",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
 }

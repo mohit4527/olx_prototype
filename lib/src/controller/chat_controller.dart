@@ -96,6 +96,9 @@ class ChatController extends GetxController {
       });
 
       chats.assignAll(result);
+
+      // Missing product images को fetch करते हैं background में
+      _fetchMissingProductImages();
     } catch (e) {
       _showSnackbar(
         "Error",
@@ -217,11 +220,43 @@ class ChatController extends GetxController {
     }
   }
 
+  // Product image fix करने के लिए - अगर कोई chat में product image नहीं है तो fetch करते हैं
+  Future<void> _fetchMissingProductImages() async {
+    for (int i = 0; i < chats.length; i++) {
+      final chat = chats[i];
+      if ((chat.productImage == null || chat.productImage!.isEmpty) &&
+          chat.productId != null &&
+          chat.productId!.isNotEmpty) {
+        try {
+          // Product API से image fetch करने की कोशिश करते हैं
+          final productDetails = await ApiService.fetchProductById(
+            chat.productId!,
+          );
+          if (productDetails != null && productDetails.mediaUrl.isNotEmpty) {
+            String imageUrl = productDetails.mediaUrl.first;
+            // URL formatting - full URL banate hैं agar relative path है
+            if (!imageUrl.startsWith('http')) {
+              imageUrl =
+                  'https://oldmarket.bhoomi.cloud/${imageUrl.replaceAll('\\', '/')}';
+            }
+            final updatedChat = chat.copyWith(productImage: imageUrl);
+            chats[i] = updatedChat;
+          }
+        } catch (e) {
+          print("Failed to fetch product image for chat ${chat.id}: $e");
+        }
+      }
+    }
+    chats.refresh();
+  }
+
   Future<void> startAndNavigateToChat({
     required String productId,
     required String productName,
     required String sellerId,
     String? productImage,
+    String? initialMessage,
+    String? sellerName,
   }) async {
     final buyerId = await AuthService.getLoggedInUserId();
     if (buyerId == null || productId.isEmpty || sellerId.isEmpty) {
@@ -241,7 +276,13 @@ class ChatController extends GetxController {
         if (Get.isRegistered<ChatDetailsController>()) {
           Get.delete<ChatDetailsController>(force: true);
         }
-        Get.toNamed(AppRoutes.chat_details, arguments: existingChat);
+        // pass through initialMessage and sellerName when available
+        final args = {
+          'chat': existingChat,
+          if (initialMessage != null) 'initialMessage': initialMessage,
+          if (sellerName != null) 'sellerName': sellerName,
+        };
+        Get.toNamed(AppRoutes.chat_details, arguments: args);
         return;
       }
 
@@ -269,7 +310,12 @@ class ChatController extends GetxController {
       if (Get.isRegistered<ChatDetailsController>()) {
         Get.delete<ChatDetailsController>(force: true);
       }
-      Get.toNamed(AppRoutes.chat_details, arguments: newChat);
+      final args = {
+        'chat': newChat,
+        if (initialMessage != null) 'initialMessage': initialMessage,
+        if (sellerName != null) 'sellerName': sellerName,
+      };
+      Get.toNamed(AppRoutes.chat_details, arguments: args);
     } catch (e) {
       Get.snackbar(
         "Error",
@@ -277,5 +323,14 @@ class ChatController extends GetxController {
         backgroundColor: AppColors.appRed,
       );
     }
+  }
+
+  @override
+  void onClose() {
+    // Clear all reactive variables to prevent memory leaks
+    chats.clear();
+    selectedChats.clear();
+    selectionMode.value = false;
+    super.onClose();
   }
 }

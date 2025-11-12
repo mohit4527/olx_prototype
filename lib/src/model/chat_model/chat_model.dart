@@ -1,8 +1,8 @@
 enum MessageStatus {
-  sending,   // ⏳ abhi bhej rahe ho
-  sent,      // ✅ ek tick
+  sending, // ⏳ abhi bhej rahe ho
+  sent, // ✅ ek tick
   delivered, // ✅✅ double tick
-  read,      // ✅✅ blue tick (agar chahiye to color change kar dena)
+  read, // ✅✅ blue tick (agar chahiye to color change kar dena)
 }
 
 class Chat {
@@ -69,6 +69,7 @@ class Chat {
   factory Chat.fromJson(Map<String, dynamic> json) {
     String? imageUrl;
 
+    // Multiple ways to extract product image - backend se different formats aa sakte hain
     if (json['productId'] is Map &&
         json['productId']['productImages'] is List &&
         (json['productId']['productImages'] as List).isNotEmpty) {
@@ -78,12 +79,26 @@ class Chat {
       } else if (firstImage is Map && firstImage['url'] != null) {
         imageUrl = firstImage['url']?.toString();
       }
+    } else if (json['productId'] is Map &&
+        json['productId']['mediaUrl'] is List &&
+        (json['productId']['mediaUrl'] as List).isNotEmpty) {
+      // mediaUrl se bhi try karte hain
+      imageUrl = (json['productId']['mediaUrl'] as List).first?.toString();
+    } else if (json['productId'] is Map &&
+        json['productId']['images'] is List &&
+        (json['productId']['images'] as List).isNotEmpty) {
+      // images array se bhi try karte hain
+      imageUrl = (json['productId']['images'] as List).first?.toString();
     } else if (json['productImage'] != null) {
       imageUrl = json['productImage']?.toString();
     }
 
-    if (imageUrl != null && imageUrl.isNotEmpty && !imageUrl.startsWith('http')) {
-      imageUrl = 'https://oldmarket.bhoomi.cloud/${imageUrl.replaceAll('\\', '/')}';
+    // URL formatting - full URL banate hain agar relative path hai
+    if (imageUrl != null &&
+        imageUrl.isNotEmpty &&
+        !imageUrl.startsWith('http')) {
+      imageUrl =
+          'https://oldmarket.bhoomi.cloud/${imageUrl.replaceAll('\\', '/')}';
     }
 
     return Chat(
@@ -123,7 +138,7 @@ class Message {
   final String content;
   final DateTime createdAt;
   MessageStatus status; // ✅ Tick status ke liye
-  bool isEdited;        // ✅ Edit track karne ke liye
+  bool isEdited; // ✅ Edit track karne ke liye
 
   Message({
     required this.id,
@@ -172,11 +187,7 @@ class Message {
     };
   }
 
-  Message copyWith({
-    String? content,
-    MessageStatus? status,
-    bool? isEdited,
-  }) {
+  Message copyWith({String? content, MessageStatus? status, bool? isEdited}) {
     return Message(
       id: id,
       chatId: chatId,

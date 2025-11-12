@@ -18,19 +18,62 @@ class AdsController extends GetxController {
   var dealerProducts = <DealerProduct>[].obs;
   var loadingDealerProducts = false.obs;
   var lastError = ''.obs;
+  // Profile-mode lists (when viewing another user's profile)
+  var profileProducts = <AllProductModel>[].obs;
+  var profileVideos = <VideoModel>[].obs;
+  // Current user ID for profile comparisons
+  var currentUserId = ''.obs;
 
   @override
   void onInit() {
     super.onInit();
     Logger.d('AdsController', 'onInit called');
-    fetchMyVideos();
-    fetchMyProducts();
+    _loadCurrentUserId();
+    // Use delayed initialization to prevent infinite reassemble
+    ever(loadingProducts, (_) => update(['products']));
+    ever(loadingVideos, (_) => update(['videos']));
+
+    // Initialize data with delay to prevent hot reload issues
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (Get.isRegistered<AdsController>()) {
+        fetchMyVideos();
+        fetchMyProducts();
+      }
+    });
+  }
+
+  @override
+  void onClose() {
+    // Clear all streams and subscriptions
+    myVideos.clear();
+    myProducts.clear();
+    dealerProducts.clear();
+    profileProducts.clear();
+    profileVideos.clear();
+    super.onClose();
+  }
+
+  Future<void> _loadCurrentUserId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      currentUserId.value =
+          prefs.getString('userId') ?? prefs.getString('user_uid') ?? '';
+      Logger.d(
+        'AdsController',
+        'Current user ID loaded: ${currentUserId.value}',
+      );
+    } catch (e) {
+      Logger.e('AdsController', 'Error loading current user ID: $e');
+    }
   }
 
   Future<void> fetchMyVideos() async {
+    if (loadingVideos.value) return; // Prevent multiple simultaneous calls
+
     try {
       Logger.d('AdsController', 'fetchMyVideos start');
       loadingVideos.value = true;
+
       // Use authenticated endpoint `/api/videos/my` which relies on Authorization header
       // This ensures the backend returns videos for the bearer-tokened user.
       final list = await ApiService.getMyVideos();
@@ -50,7 +93,11 @@ class AdsController extends GetxController {
         return v.uploaderId.isNotEmpty && v.uploaderId == currentUserId;
       }).toList();
 
-      myVideos.assignAll(filtered);
+      if (!identical(myVideos, filtered)) {
+        myVideos.assignAll(filtered);
+        update(['videos']); // Trigger specific update
+      }
+
       Logger.d('AdsController', 'All videos loaded: ${myVideos.length}');
       lastError.value = '';
     } catch (e) {
@@ -80,12 +127,52 @@ class AdsController extends GetxController {
   }
 
   Future<void> fetchMyProducts() async {
+    if (loadingProducts.value) return; // Prevent multiple simultaneous calls
+
     try {
       Logger.d('AdsController', 'fetchMyProducts start');
       loadingProducts.value = true;
+
+      // Get current user ID for double-check filtering
+      final prefs = await SharedPreferences.getInstance();
+      final currentUserId =
+          prefs.getString('userId') ?? prefs.getString('user_uid') ?? '';
+      Logger.d('AdsController', 'Current user ID: $currentUserId');
+
       final mine = await ApiService.getMyProducts();
-      myProducts.assignAll(mine);
-      Logger.d('AdsController', 'All products loaded: ${myProducts.length}');
+
+      // Additional safety check: ensure all products belong to current user
+      List<AllProductModel> filteredProducts = mine;
+      if (currentUserId.isNotEmpty) {
+        filteredProducts = mine.where((product) {
+          bool isMyProduct =
+              product.userId == currentUserId ||
+              product.userId == currentUserId.toString() ||
+              (product.userId.isNotEmpty &&
+                  product.userId.contains(currentUserId));
+
+          if (!isMyProduct) {
+            Logger.d(
+              'AdsController',
+              'Filtering out product: ${product.title} (userId: ${product.userId}) - not current user: $currentUserId',
+            );
+          }
+
+          return isMyProduct;
+        }).toList();
+
+        Logger.d(
+          'AdsController',
+          'Filtered ${mine.length} -> ${filteredProducts.length} products for user: $currentUserId',
+        );
+      }
+
+      if (!identical(myProducts, filteredProducts)) {
+        myProducts.assignAll(filteredProducts);
+        update(['products']); // Trigger specific update
+      }
+
+      Logger.d('AdsController', 'My products loaded: ${myProducts.length}');
     } catch (e) {
       Logger.d('AdsController', 'fetchMyProducts error: $e');
     } finally {
@@ -141,6 +228,72 @@ class AdsController extends GetxController {
       dealerProducts.clear();
     } finally {
       loadingDealerProducts(false);
+    }
+  }
+
+  /// Fetch products uploaded by a specific user id (public profile view)
+  Future<void> fetchProductsByUserId(String userId) async {
+    try {
+      loadingProducts.value = true;
+      // getAllProducts returns many items; filter by common owner fields.
+      final all = await ApiService.getAllProducts();
+      final filtered = <AllProductModel>[];
+      for (final p in all) {
+        try {
+          if (p.userId == userId) filtered.add(p);
+        } catch (_) {}
+      }
+      profileProducts.assignAll(filtered);
+    } catch (e) {
+      lastError.value = e.toString();
+      profileProducts.clear();
+    } finally {
+      loadingProducts.value = false;
+    }
+  }
+
+  Future<void> fetchVideosByUserId(String userId) async {
+    try {
+      loadingVideos.value = true;
+      Logger.d(
+        'AdsController',
+        'fetchVideosByUserId start for userId: $userId',
+      );
+
+      // Get current user ID to check if this is the same user
+      String currentUserId = '';
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        currentUserId =
+            prefs.getString('userId') ?? prefs.getString('user_uid') ?? '';
+      } catch (_) {}
+
+      if (currentUserId.isNotEmpty && currentUserId == userId) {
+        // If it's current user, use the regular fetchMyVideos method
+        Logger.d('AdsController', 'Fetching videos for current user');
+        await fetchMyVideos();
+        profileVideos.assignAll(myVideos);
+      } else {
+        // For other users, get all videos and filter by uploaderId
+        Logger.d('AdsController', 'Fetching videos for profile user: $userId');
+        final apiService = ApiService();
+        final allVideos = await apiService.fetchVideos();
+        final filtered = allVideos
+            .where((v) => v.uploaderId == userId)
+            .toList();
+        profileVideos.assignAll(filtered);
+        Logger.d(
+          'AdsController',
+          'Filtered ${filtered.length} videos for user $userId',
+        );
+      }
+    } catch (e) {
+      Logger.e('AdsController', 'fetchVideosByUserId error: $e');
+      lastError.value = e.toString();
+      profileVideos.clear();
+    } finally {
+      loadingVideos.value = false;
+      Logger.d('AdsController', 'fetchVideosByUserId finished');
     }
   }
 

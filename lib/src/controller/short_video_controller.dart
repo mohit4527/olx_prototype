@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:math';
 import 'package:get/get.dart';
 import '../utils/logger.dart';
 import '../model/short_video_model/short_video_model.dart';
@@ -17,6 +18,8 @@ class ShortVideoController extends GetxController {
   // In ShortVideoController
   RxBool get isLoading => isLoadingAllVideos;
   RxList<VideoModel> videos = <VideoModel>[].obs;
+  RxList<VideoModel> _originalVideos =
+      <VideoModel>[].obs; // Store original list
   RxList<VideoModel> suggestedVideos = <VideoModel>[].obs;
 
   // Loading states
@@ -50,15 +53,19 @@ class ShortVideoController extends GetxController {
     await fetchSuggestedVideos();
   }
 
-  // Fetch all videos
+  // Fetch all videos with randomization
   Future<void> loadAllVideos() async {
     try {
       isLoadingAllVideos.value = true;
       Logger.d('ShortVideoController', 'loadAllVideos started');
 
       final list = await _api.fetchVideos();
-      videos.assignAll(list);
-      Logger.d('ShortVideoController', 'All videos loaded: ${videos.length}');
+      _originalVideos.assignAll(list); // Store original
+      shuffleVideos(); // Apply randomization
+      Logger.d(
+        'ShortVideoController',
+        'All videos loaded with shuffle: ${videos.length}',
+      );
     } catch (e) {
       print("[Controller] loadAllVideos error: $e");
     } finally {
@@ -67,25 +74,59 @@ class ShortVideoController extends GetxController {
     }
   }
 
-  // Fetch suggested videos (example: every alternate video)
+  /// 🎲 Shuffle videos for variety
+  void shuffleVideos() {
+    if (_originalVideos.isEmpty) return;
+
+    Logger.d(
+      'ShortVideoController',
+      '🎲 Shuffling ${_originalVideos.length} videos...',
+    );
+
+    List<VideoModel> shuffledList = List.from(_originalVideos);
+    shuffledList.shuffle(Random());
+
+    videos.assignAll(shuffledList);
+
+    Logger.d(
+      'ShortVideoController',
+      '✅ Videos shuffled! First video: ${shuffledList.isNotEmpty ? shuffledList.first.id : 'None'}',
+    );
+  }
+
+  /// 🔄 Refresh videos with new randomization
+  Future<void> refreshVideos() async {
+    Logger.d(
+      'ShortVideoController',
+      '🔄 Refreshing videos with new randomization...',
+    );
+    await loadAllVideos(); // This will fetch fresh data and auto-shuffle
+    await fetchSuggestedVideos(); // Refresh suggested videos too
+  }
+
+  // Fetch suggested videos with randomization
   Future<void> fetchSuggestedVideos() async {
     try {
       isLoadingVideos.value = true;
       Logger.d('ShortVideoController', 'fetchSuggestedVideos started');
 
-      // Use already loaded videos from `videos` instead of calling API again
-      if (videos.isEmpty) {
+      // Use original videos list for better randomization
+      if (_originalVideos.isEmpty) {
         Logger.d('ShortVideoController', 'No videos available to suggest');
         suggestedVideos.clear();
         return;
       }
 
-      // Take first 5 videos as suggested
-      suggestedVideos.assignAll(videos.take(5).toList());
+      // 🎲 Randomize suggested videos selection
+      List<VideoModel> shuffledOriginals = List.from(_originalVideos);
+      shuffledOriginals.shuffle(Random());
+
+      // Take random 5 videos as suggested
+      suggestedVideos.assignAll(shuffledOriginals.take(5).toList());
 
       Logger.d(
         'ShortVideoController',
-        'Suggested videos loaded: ${suggestedVideos.length}',
+        'Suggested videos loaded with randomization: ${suggestedVideos.length}',
       );
     } catch (e) {
       Logger.d('ShortVideoController', 'fetchSuggestedVideos error: $e');

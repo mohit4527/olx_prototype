@@ -1,6 +1,5 @@
 // lib/src/model/dealer_product_model.dart
 
-
 class DealerProductModel {
   final bool status;
   final String message;
@@ -57,19 +56,40 @@ class DealerProduct {
   });
 
   factory DealerProduct.fromJson(Map<String, dynamic> json) {
+    // 🔹 Handle dealerId as both String and Object
+    String? parsedDealerId;
+    String? parsedPhone;
+
+    final dealerIdField = json['dealerId'];
+    if (dealerIdField != null) {
+      if (dealerIdField is String) {
+        parsedDealerId = dealerIdField;
+      } else if (dealerIdField is Map<String, dynamic>) {
+        parsedDealerId = dealerIdField['_id'] as String?;
+        parsedPhone = dealerIdField['phone'] as String?;
+      }
+    }
+
+    // Use phone from dealerId object if available, otherwise from direct phone field
+    final finalPhone = parsedPhone ?? json['phone'] as String?;
+
     return DealerProduct(
       id: json['_id'] as String? ?? '',
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       price: json['price'] as int? ?? 0,
       sellerType: json['sellerType'] as String? ?? '',
-      dealerId: json['dealerId'] as String?,
+      dealerId: parsedDealerId,
       dealerName: json['dealerName'] as String?,
-      phone: json['phone'] as String?, // 🔹 Parse JSON
+      phone: finalPhone, // 🔹 Use extracted phone
       tags: (json['tags'] as List? ?? []).map((e) => e.toString()).toList(),
       images: (json['images'] as List? ?? []).map((e) => e.toString()).toList(),
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+          DateTime.now(),
       location: json['location'] as String?,
     );
   }

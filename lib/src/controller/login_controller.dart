@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:olx_prototype/src/controller/get_profile_controller.dart';
 import 'package:olx_prototype/src/services/apiServices/apiServices.dart';
 import 'package:olx_prototype/src/utils/app_routes.dart';
+import 'package:olx_prototype/src/controller/dealer_controller.dart'; // 🔥 Added dealer controller import
 
 /// LoginController for handling login logic
 class LoginController extends GetxController {
@@ -122,7 +123,28 @@ class LoginController extends GetxController {
             if (Get.isRegistered<GetProfileController>()) {
               Get.find<GetProfileController>().loadProfileFromPrefs();
             }
-          } catch (_) {}
+
+            // 🔥 IMPROVED: Check dealer profile for current user after login
+            if (Get.isRegistered<DealerProfileController>()) {
+              final dealerController = Get.find<DealerProfileController>();
+              print(
+                '🔍 [LoginController] Checking dealer profile for logged in user...',
+              );
+              await dealerController.checkIfProfileExists();
+
+              // Force refresh state after check
+              dealerController.isProfileCreated.refresh();
+              print(
+                '✅ [LoginController] Dealer profile check completed - isProfileCreated: ${dealerController.isProfileCreated.value}',
+              );
+            } else {
+              print(
+                '⚠️ [LoginController] DealerProfileController not registered',
+              );
+            }
+          } catch (loginError) {
+            print('💥 [LoginController] Error in login process: $loginError');
+          }
           Get.offAllNamed(AppRoutes.home);
         },
         verificationFailed: (FirebaseAuthException e) {
@@ -191,6 +213,22 @@ class LoginController extends GetxController {
         smsCode: otp,
       );
       await _auth.signInWithCredential(credential);
+
+      // 🔥 IMPROVED: Check dealer profile for current user after OTP login
+      try {
+        if (Get.isRegistered<DealerProfileController>()) {
+          final dealerController = Get.find<DealerProfileController>();
+          print('🔍 [LoginController] OTP Login - Checking dealer profile...');
+          await dealerController.checkIfProfileExists();
+          dealerController.isProfileCreated.refresh();
+          print(
+            '✅ [LoginController] OTP Login - Profile check completed: ${dealerController.isProfileCreated.value}',
+          );
+        }
+      } catch (otpError) {
+        print('💥 [LoginController] OTP Login error: $otpError');
+      }
+
       isLoading.value = false;
       Get.offAllNamed(AppRoutes.home);
     } catch (e) {
@@ -258,6 +296,23 @@ class LoginController extends GetxController {
           colorText: Colors.green.shade900,
           snackPosition: SnackPosition.TOP,
         );
+
+        // 🔥 IMPROVED: Check dealer profile for current user after Google login
+        try {
+          if (Get.isRegistered<DealerProfileController>()) {
+            final dealerController = Get.find<DealerProfileController>();
+            print(
+              '🔍 [LoginController] Google Login - Checking dealer profile...',
+            );
+            await dealerController.checkIfProfileExists();
+            dealerController.isProfileCreated.refresh();
+            print(
+              '✅ [LoginController] Google Login - Profile check completed: ${dealerController.isProfileCreated.value}',
+            );
+          }
+        } catch (googleError) {
+          print('💥 [LoginController] Google Login error: $googleError');
+        }
 
         // Navigate to home
         Get.offAllNamed(AppRoutes.home);
@@ -327,6 +382,15 @@ class LoginController extends GetxController {
 
       // Clear tokens and user data
       await tokenController.clearToken();
+
+      // 🔥 NEW: Clear dealer profile data for current user
+      try {
+        if (Get.isRegistered<DealerProfileController>()) {
+          final dealerController = Get.find<DealerProfileController>();
+          dealerController.isProfileCreated.value = false;
+          await dealerController.clearDealerDataFromPrefs();
+        }
+      } catch (_) {}
 
       // Update observables
       isLoggedIn.value = false;

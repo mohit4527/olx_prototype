@@ -11,6 +11,9 @@ class TokenController extends GetxController {
   // Expose saved user display name and photo url for UI
   var displayName = ''.obs;
   var photoUrl = ''.obs;
+  // For deep link navigation after login
+  String? pendingProductId;
+  String? pendingDealerProductId;
 
   @override
   void onInit() {
@@ -48,6 +51,10 @@ class TokenController extends GetxController {
       apiToken.value = token;
       loggedInFlag.value = true;
       Logger.d('TokenController', 'Token saved successfully');
+
+      // Handle pending deep link navigation after login
+      await _handlePendingNavigation();
+
       // If AdsController is active, refresh its data so "My Ads" reflects the logged-in user
       try {
         if (Get.isRegistered<AdsController>()) {
@@ -163,8 +170,39 @@ class TokenController extends GetxController {
       await prefs.setBool('isLoggedIn', true);
       loggedInFlag.value = true;
       Logger.d('TokenController', 'Marked user as logged in (external)');
+
+      // Handle pending deep link navigation after login
+      await _handlePendingNavigation();
     } catch (e) {
       Logger.d('TokenController', 'Error marking logged in: $e');
+    }
+  }
+
+  /// Handle pending deep link navigation after login
+  Future<void> _handlePendingNavigation() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (pendingProductId != null) {
+      final productId = pendingProductId!;
+      pendingProductId = null; // Clear it
+
+      Get.offAllNamed('/home');
+      await Future.delayed(const Duration(milliseconds: 300));
+      Get.toNamed('/description', arguments: productId);
+
+      Logger.d('TokenController', 'Navigated to pending product: $productId');
+    } else if (pendingDealerProductId != null) {
+      final dealerProductId = pendingDealerProductId!;
+      pendingDealerProductId = null; // Clear it
+
+      Get.offAllNamed('/home');
+      await Future.delayed(const Duration(milliseconds: 300));
+      Get.toNamed('/dealer_product_description', arguments: dealerProductId);
+
+      Logger.d(
+        'TokenController',
+        'Navigated to pending dealer product: $dealerProductId',
+      );
     }
   }
 }

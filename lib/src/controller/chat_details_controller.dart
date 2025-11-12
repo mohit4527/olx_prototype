@@ -14,28 +14,56 @@ class ChatDetailsController extends GetxController {
   var isLoading = true.obs;
   var isReady = false.obs;
 
-  Future<void> initChat(Chat newChat) async {
+  Future<void> initChat(dynamic newChatArg) async {
     try {
       isLoading(true);
       isReady(false);
-
-      chat = newChat;
+      String? initialMessage;
+      if (newChatArg is Chat) {
+        chat = newChatArg;
+      } else if (newChatArg is Map) {
+        // arguments passed as {'chat': Chat, 'initialMessage': '...'}
+        chat = newChatArg['chat'] as Chat;
+        initialMessage = newChatArg['initialMessage'] as String?;
+      } else {
+        Get.snackbar(
+          "Error",
+          "Invalid chat argument.",
+          backgroundColor: AppColors.appRed,
+          colorText: AppColors.appWhite,
+        );
+        isLoading(false);
+        return;
+      }
       messages.clear();
 
       userId ??= await AuthService.getLoggedInUserId();
       if (userId == null || chat.id.isEmpty) {
         isLoading(false);
-        Get.snackbar("Error", "User or Chat details are missing.",
-            backgroundColor: AppColors.appRed, colorText: AppColors.appWhite);
+        Get.snackbar(
+          "Error",
+          "User or Chat details are missing.",
+          backgroundColor: AppColors.appRed,
+          colorText: AppColors.appWhite,
+        );
         return;
       }
 
       await fetchMessages();
 
+      // If we have an initial message provided, prefill the input so user sees context
+      if (initialMessage != null && initialMessage.isNotEmpty) {
+        messageController.text = initialMessage;
+      }
+
       isReady(true);
     } catch (e) {
-      Get.snackbar("Error", "Failed to init chat: $e",
-          backgroundColor: AppColors.appRed, colorText: AppColors.appWhite);
+      Get.snackbar(
+        "Error",
+        "Failed to init chat: $e",
+        backgroundColor: AppColors.appRed,
+        colorText: AppColors.appWhite,
+      );
     } finally {
       isLoading(false);
     }
@@ -45,16 +73,24 @@ class ChatDetailsController extends GetxController {
     try {
       isLoading(true);
       if (chat.id.isEmpty) {
-        Get.snackbar("Error", "Chat ID is empty.",
-            backgroundColor: AppColors.appRed, colorText: AppColors.appWhite);
+        Get.snackbar(
+          "Error",
+          "Chat ID is empty.",
+          backgroundColor: AppColors.appRed,
+          colorText: AppColors.appWhite,
+        );
         return;
       }
       final result = await ApiService.getMessages(chat.id);
       result.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       messages.assignAll(result);
     } catch (e) {
-      Get.snackbar("Error", "Failed to load messages: $e",
-          backgroundColor: AppColors.appRed, colorText: AppColors.appWhite);
+      Get.snackbar(
+        "Error",
+        "Failed to load messages: $e",
+        backgroundColor: AppColors.appRed,
+        colorText: AppColors.appWhite,
+      );
     } finally {
       isLoading(false);
     }
@@ -65,8 +101,12 @@ class ChatDetailsController extends GetxController {
     if (content.isEmpty) return;
 
     if (!isReady.value || userId == null || chat.id.isEmpty) {
-      Get.snackbar("Error", "Chat is not ready. Please wait.",
-          backgroundColor: AppColors.appRed, colorText: AppColors.appWhite);
+      Get.snackbar(
+        "Error",
+        "Chat is not ready. Please wait.",
+        backgroundColor: AppColors.appRed,
+        colorText: AppColors.appWhite,
+      );
       return;
     }
 
@@ -97,8 +137,12 @@ class ChatDetailsController extends GetxController {
     } catch (e) {
       messages.removeWhere((m) => m.id == tempMessage.id);
       messageController.text = content;
-      Get.snackbar("Error", "Failed to send message: $e",
-          backgroundColor: AppColors.appRed, colorText: AppColors.appWhite);
+      Get.snackbar(
+        "Error",
+        "Failed to send message: $e",
+        backgroundColor: AppColors.appRed,
+        colorText: AppColors.appWhite,
+      );
     }
   }
 

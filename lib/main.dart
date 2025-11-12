@@ -19,7 +19,9 @@ import 'package:olx_prototype/src/controller/theme_controller.dart';
 import 'package:olx_prototype/src/controller/token_controller.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:olx_prototype/src/services/notification_services/notification_services.dart';
+import 'package:olx_prototype/src/services/deep_link_service.dart';
 import 'package:olx_prototype/src/utils/app_routes.dart';
+import 'package:olx_prototype/src/utils/logger.dart';
 
 /// Background FCM handler (do not initialize Firebase here!)
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -65,6 +67,9 @@ Future<void> main() async {
   // Initialize notifications
   await _initNotifications();
 
+  // Initialize deep link service
+  await _initDeepLinks();
+
   // If Firebase has an already signed-in user (e.g., Google), mark as logged in
   try {
     final firebaseUser = FirebaseAuth.instance.currentUser;
@@ -99,6 +104,17 @@ Future<void> _initNotifications() async {
     });
   } catch (e) {
     print("⚠️ Notification init failed: $e");
+  }
+}
+
+/// Deep link initialization
+Future<void> _initDeepLinks() async {
+  try {
+    final deepLinkService = DeepLinkService();
+    await deepLinkService.initialize();
+    print("🔗 Deep link service initialized successfully");
+  } catch (e) {
+    print("⚠️ Deep link init failed: $e");
   }
 }
 
@@ -153,24 +169,27 @@ class _DebugRouteObserver extends NavigatorObserver {
   @override
   void didPush(Route route, Route? previousRoute) {
     super.didPush(route, previousRoute);
-    print(
-      '[RouteObserver] didPush -> ${route.settings.name}, from ${previousRoute?.settings.name}',
+    Logger.i(
+      'RouteObserver',
+      'didPush -> ${route.settings.name}, from ${previousRoute?.settings.name}',
     );
   }
 
   @override
   void didPop(Route route, Route? previousRoute) {
     super.didPop(route, previousRoute);
-    print(
-      '[RouteObserver] didPop -> ${route.settings.name}, back to ${previousRoute?.settings.name}',
+    Logger.i(
+      'RouteObserver',
+      'didPop -> ${route.settings.name}, back to ${previousRoute?.settings.name}',
     );
   }
 
   @override
   void didReplace({Route? newRoute, Route? oldRoute}) {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
-    print(
-      '[RouteObserver] didReplace -> ${oldRoute?.settings.name} with ${newRoute?.settings.name}',
+    Logger.i(
+      'RouteObserver',
+      'didReplace -> ${oldRoute?.settings.name} with ${newRoute?.settings.name}',
     );
   }
 }

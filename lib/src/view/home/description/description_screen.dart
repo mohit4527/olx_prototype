@@ -10,12 +10,17 @@ import 'package:olx_prototype/src/controller/description_controller.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 import '../../../controller/all_products_controller.dart';
 import '../../../controller/book_test_drive_controller.dart';
 import '../../../controller/user_make_offer_controller.dart';
 import '../../../controller/user_wishlist_controller.dart';
 import '../../../custom_widgets/desription_screen_card.dart';
-import '../../../custom_widgets/share_products_bottomsheet.dart';
+import '../../../services/phone_resolver_service.dart';
+
 // ...existing imports...
 
 class DescriptionScreen extends StatefulWidget {
@@ -54,7 +59,12 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
     makeOfferController = Get.put(MakeOfferController());
     productcontroller = Get.put(ProductController());
     bookTestDriveController = Get.put(BookTestDriveController());
-    Get.put(ChatController());
+    // Use Get.find if already exists, otherwise create new
+    try {
+      Get.find<ChatController>();
+    } catch (e) {
+      Get.put(ChatController());
+    }
     // Debug: log that DescriptionScreen initState ran with the carId
     print('[DescriptionScreen] initState called for carId: ${widget.carId}');
     // debug snackbar removed - no visual debug feedback shown now
@@ -70,46 +80,289 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
 
   Future<void> _openDialer(String phoneNumber) async {
     try {
-      final cleaned = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      final cleaned = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
       if (cleaned.isEmpty) {
         Get.snackbar('Error', 'Phone number not available');
         return;
       }
 
-      // Normalize: if 10 digits assume India and prefix with +91 for dialing
+      // 🔥 Debug device info
+      print('[DescriptionScreen] 🔥 DEVICE CALL DEBUG:');
+      print('[DescriptionScreen] Original phone: $phoneNumber');
+      print('[DescriptionScreen] Cleaned phone: $cleaned');
+
+      // Normalize phone number for India
       String dialNumber = cleaned;
       if (cleaned.length == 10) {
         dialNumber = '+91$cleaned';
-      } else if (!cleaned.startsWith('+') &&
-          cleaned.length > 10 &&
-          !cleaned.startsWith('0')) {
-        // if already contains country code e.g. 9198..., add +
+      } else if (!cleaned.startsWith('+') && cleaned.length > 10) {
         dialNumber = '+$cleaned';
       } else if (cleaned.startsWith('0')) {
-        // strip leading zero and prefix +91
         final stripped = cleaned.replaceFirst(RegExp(r'^0+'), '');
         if (stripped.length == 10) dialNumber = '+91$stripped';
       }
 
-      final uri = Uri(scheme: 'tel', path: dialNumber);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        Get.snackbar('Error', 'Unable to open dialer');
+      // Show connecting message first
+      Get.snackbar(
+        "📞 Calling...",
+        "Connecting to: $dialNumber",
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green.shade100,
+        colorText: Colors.green.shade800,
+        duration: const Duration(seconds: 2),
+      );
+
+      // 🔥 Multiple call attempts with different methods
+      print('[DescriptionScreen] Attempting to call: $dialNumber');
+
+      bool callSuccess = false;
+
+      // METHOD 1: Standard tel: URI
+      try {
+        final uri = Uri(scheme: 'tel', path: dialNumber);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          callSuccess = true;
+          print('[DescriptionScreen] ✅ Call launched with tel: URI');
+        }
+      } catch (e) {
+        print('[DescriptionScreen] ❌ Tel URI failed: $e');
+      }
+
+      // METHOD 2: Try with different launch modes
+      if (!callSuccess) {
+        try {
+          final uri = Uri.parse('tel:$dialNumber');
+          await launchUrl(uri, mode: LaunchMode.platformDefault);
+          callSuccess = true;
+          print(
+            '[DescriptionScreen] ✅ Call launched with platformDefault mode',
+          );
+        } catch (e) {
+          print('[DescriptionScreen] ❌ PlatformDefault mode failed: $e');
+        }
+      }
+
+      // METHOD 3: Try system call intent
+      if (!callSuccess) {
+        try {
+          final uri = Uri.parse('tel:$dialNumber');
+          await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
+          callSuccess = true;
+          print('[DescriptionScreen] ✅ Call launched with external app mode');
+        } catch (e) {
+          print('[DescriptionScreen] ❌ External app mode failed: $e');
+        }
+      }
+
+      if (!callSuccess) {
+        // Final fallback: Multiple options for user
+        await Clipboard.setData(ClipboardData(text: dialNumber));
+
+        Get.defaultDialog(
+          title: "📞 Make Call",
+          titleStyle: TextStyle(
+            color: Colors.green.shade700,
+            fontWeight: FontWeight.bold,
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Phone: $dialNumber",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              SizedBox(height: 16),
+              Text(
+                "Number copied to clipboard!",
+                style: TextStyle(color: Colors.blue.shade600),
+              ),
+              SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      Get.back();
+                      try {
+                        // Force launch with different method
+                        await launchUrl(
+                          Uri.parse('tel:$dialNumber'),
+                          mode: LaunchMode.platformDefault,
+                        );
+                      } catch (e) {
+                        print('[Call] Force launch failed: $e');
+                        Get.snackbar(
+                          'Info',
+                          'Please open dialer manually and call $dialNumber',
+                        );
+                      }
+                    },
+                    icon: Icon(Icons.phone, size: 16),
+                    label: Text("Try Call"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Get.back();
+                      Get.snackbar(
+                        '📋 Copied',
+                        'Open your phone dialer and paste: $dialNumber',
+                        duration: Duration(seconds: 4),
+                      );
+                    },
+                    icon: Icon(Icons.content_copy, size: 16),
+                    label: Text("Copy"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Get.back(), child: Text("Cancel")),
+          ],
+        );
       }
     } catch (e) {
       print('[DescriptionScreen] _openDialer error: $e');
-      Get.snackbar('Error', 'Unable to open dialer');
+      Get.snackbar(
+        "❌ Call Error",
+        "Cannot make call. Please dial $phoneNumber manually.",
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red.shade100,
+        colorText: Colors.red.shade800,
+        duration: const Duration(seconds: 4),
+      );
     }
   }
 
   // legacy helper removed — using _shareOnWhatsApp for sharing text to WhatsApp
 
-  /// Share a message on WhatsApp so the user can pick any contact to send to.
+  /// Share a message on WhatsApp with product image
   Future<void> _shareOnWhatsApp(String message) async {
     try {
+      // Show loading indicator
+      Get.snackbar(
+        "Sharing...",
+        "Preparing product image for WhatsApp",
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
+      );
+
+      // Try to get product image and share with image
+      final imageShared = await _shareWithProductImage(message);
+
+      if (!imageShared) {
+        // Fallback to text-only sharing
+        await _shareTextOnlyWhatsApp(message);
+      }
+    } catch (e) {
+      print('[DescriptionScreen] _shareOnWhatsApp error: $e');
+      await _shareTextOnlyWhatsApp(message);
+    }
+  }
+
+  /// Share with product image
+  Future<bool> _shareWithProductImage(String message) async {
+    try {
+      final product = controller.product.value;
+      if (product?.mediaUrl.isNotEmpty == true) {
+        String imageUrl = product!.mediaUrl.first;
+        if (!imageUrl.startsWith('http')) {
+          imageUrl = 'https://oldmarket.bhoomi.cloud/$imageUrl';
+        }
+
+        // Download image
+        final response = await http.get(Uri.parse(imageUrl));
+        if (response.statusCode == 200) {
+          // Save to temporary file
+          final tempDir = await getTemporaryDirectory();
+          final file = File(
+            '${tempDir.path}/product_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          );
+          await file.writeAsBytes(response.bodyBytes);
+
+          // Share with image
+          await Share.shareXFiles(
+            [XFile(file.path)],
+            text: message,
+            subject: 'Check out this product on Old Market!',
+          );
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      print('Error sharing with image: $e');
+      return false;
+    }
+  }
+
+  /// Share product via native share dialog (NOT WhatsApp specific)
+  Future<void> _shareProductDirectly(dynamic product) async {
+    try {
+      print(
+        '[Share] 📤 Opening native share dialog for product: ${product.title}',
+      );
+
+      // Show preparing message
+      Get.snackbar(
+        "📤 Preparing Share",
+        "Getting product details ready for sharing...",
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
+        backgroundColor: Colors.blue,
+        colorText: Colors.white,
+      );
+
+      // Create rich sharing message for general sharing
+      String shareMessage = '🛍️ Check out this amazing product!\n\n';
+      shareMessage += '📦 *${product.title}*\n';
+      shareMessage += '💰 Price: *₹${product.price}*\n';
+      if (product.city != null && product.city.isNotEmpty) {
+        shareMessage += '📍 Location: *${product.city}*\n';
+      }
+      if (product.description != null && product.description.isNotEmpty) {
+        final shortDesc = product.description.length > 100
+            ? '${product.description.substring(0, 100)}...'
+            : product.description;
+        shareMessage += '📝 ${shortDesc}\n';
+      }
+      shareMessage +=
+          '\n🔗 View details: https://oldmarket.bhoomi.cloud/app/product/${product.id}\n';
+      shareMessage +=
+          '\n📱 Get the Old Market app for the best shopping experience!';
+
+      // Try to share with product image using native share
+      final imageShared = await _shareWithProductImage(shareMessage);
+
+      if (!imageShared) {
+        // Fallback to text-only sharing
+        await Share.share(
+          shareMessage,
+          subject: 'Check out this product on Old Market!',
+        );
+      }
+    } catch (e) {
+      print('[DescriptionScreen] _shareProductDirectly error: $e');
+      // Final fallback
+      await Share.share(
+        'Check out this product: https://oldmarket.bhoomi.cloud/app/product/${product.id}',
+        subject: 'Check out this product on Old Market!',
+      );
+    }
+  }
+
+  /// Text-only WhatsApp sharing fallback
+  Future<void> _shareTextOnlyWhatsApp(String message) async {
+    try {
       final encoded = Uri.encodeComponent(message);
-      // Try whatsapp:// with text first (some platforms support text param)
+      // Try whatsapp:// with text first
       final uriApp = Uri.parse('whatsapp://send?text=$encoded');
       if (await canLaunchUrl(uriApp)) {
         await launchUrl(uriApp, mode: LaunchMode.externalApplication);
@@ -123,24 +376,30 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
         return;
       }
 
-      // Final fallback: open system share sheet
-      Get.snackbar('Error', 'WhatsApp not available');
+      // Final fallback: system share
+      await Share.share(message);
     } catch (e) {
-      print('[DescriptionScreen] _shareOnWhatsApp error: $e');
       Get.snackbar('Error', 'Unable to share on WhatsApp');
     }
   }
 
-  /// Open WhatsApp chat directly with a specific phone number (uploader's number).
+  /// Direct WhatsApp messaging to seller (no image sharing)
   Future<void> _openWhatsAppChat(String rawPhone, String message) async {
     try {
+      print('[WhatsApp] � Opening direct seller messaging...');
+
       final cleaned = rawPhone.replaceAll(RegExp(r'[^0-9]'), '');
       if (cleaned.isEmpty) {
-        Get.snackbar('Error', 'WhatsApp number not available');
+        Get.snackbar(
+          '❌ Invalid Number',
+          'Seller WhatsApp number not available',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
         return;
       }
 
-      // Build international number without '+' for WhatsApp API
+      // Build international number for WhatsApp
       String waNumber = cleaned;
       if (cleaned.length == 10) {
         waNumber = '91$cleaned';
@@ -151,25 +410,60 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
         waNumber = cleaned.replaceFirst('+', '');
       }
 
+      print('[WhatsApp] � Messaging seller at: $waNumber');
+
+      // Direct WhatsApp message to seller
       final encoded = Uri.encodeComponent(message);
       final uriApp = Uri.parse('whatsapp://send?phone=$waNumber&text=$encoded');
+
       if (await canLaunchUrl(uriApp)) {
         await launchUrl(uriApp, mode: LaunchMode.externalApplication);
+        print('[WhatsApp] ✅ WhatsApp app opened for seller chat');
+
+        Get.snackbar(
+          "💬 WhatsApp Opened",
+          "Direct messaging with seller: $rawPhone",
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
         return;
       }
 
+      // Try WhatsApp web fallback
       final uriWeb = Uri.parse(
         'https://api.whatsapp.com/send?phone=$waNumber&text=$encoded',
       );
       if (await canLaunchUrl(uriWeb)) {
         await launchUrl(uriWeb, mode: LaunchMode.externalApplication);
+        print('[WhatsApp] ✅ WhatsApp web opened for seller chat');
+
+        Get.snackbar(
+          "💬 WhatsApp Web Opened",
+          "Direct messaging with seller: $rawPhone",
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
         return;
       }
 
-      Get.snackbar('Error', 'WhatsApp not available');
+      // If WhatsApp not available
+      Get.snackbar(
+        '❌ WhatsApp Not Available',
+        'WhatsApp is not installed on this device',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
     } catch (e) {
-      print('[DescriptionScreen] _openWhatsAppChat error: $e');
-      Get.snackbar('Error', 'Unable to open WhatsApp');
+      print('[WhatsApp] Error opening seller chat: $e');
+      Get.snackbar(
+        '❌ WhatsApp Error',
+        'Unable to open WhatsApp for messaging. Please try again.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     }
   }
 
@@ -301,16 +595,324 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
 
                   SizedBox(height: AppSizer().height3),
 
-                  // User id
+                  // Enhanced User Profile Section
                   Obx(() {
                     if (controller.product.value == null)
                       return const SizedBox();
                     final product = controller.product.value!;
-                    return Text(
-                      "User Id: ${product.id}",
-                      style: TextStyle(
-                        fontSize: AppSizer().fontSize16,
-                        fontWeight: FontWeight.w600,
+                    final userId = product.userId ?? '';
+
+                    // 🆕 Use API-fetched uploader profile data
+                    String userName = controller.uploaderName.value.isNotEmpty
+                        ? controller.uploaderName.value
+                        : (widget.sellerName.isNotEmpty
+                              ? widget.sellerName
+                              : 'Seller');
+
+                    String userAvatar = controller.uploaderImage.value;
+                    int productCount = controller.uploaderProductCount.value;
+                    int videoCount = controller.uploaderVideoCount.value;
+
+                    // Show loading indicator if profile is still being fetched
+                    bool isProfileLoading =
+                        controller.uploaderName.value.isEmpty &&
+                        controller.isLoading.value;
+
+                    print(
+                      '[ProfileCard] 🎯 Profile data: name=$userName, avatar=$userAvatar, products=$productCount, videos=$videoCount',
+                    );
+
+                    // Fallback to old logic if API data not loaded yet
+                    if (controller.uploaderName.value.isEmpty) {
+                      if (widget.sellerName.isEmpty && userId.isNotEmpty) {
+                        // Create a readable username from userId
+                        if (userId.length > 12) {
+                          userName =
+                              'User ${userId.substring(userId.length - 8)}';
+                        } else if (userId.length > 6) {
+                          userName = 'User ${userId.substring(0, 6)}';
+                        } else {
+                          userName = 'User $userId';
+                        }
+                      }
+
+                      // If no seller name and no userId, use product title as context
+                      if (userName == 'Seller' && product.title.isNotEmpty) {
+                        userName = '${product.title} Seller';
+                      }
+                    }
+
+                    return GestureDetector(
+                      onTap: () {
+                        if (userId.isNotEmpty) {
+                          // Navigate to seller products screen with profile mode
+                          Get.toNamed(
+                            '/ads_screen',
+                            arguments: {
+                              'profileUserId': userId,
+                              'profileName': userName,
+                              'profileAvatar': userAvatar,
+                            },
+                          );
+                        }
+                      },
+                      child: Container(
+                        margin: EdgeInsets.symmetric(
+                          vertical: AppSizer().height1,
+                        ),
+                        padding: EdgeInsets.all(AppSizer().height2),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.appGreen.withOpacity(0.1),
+                              Colors.white,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: AppColors.appGreen.withOpacity(0.3),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.appGreen.withOpacity(0.2),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            // Enhanced Profile Avatar
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.appGreen,
+                                    AppColors.appGreen.withOpacity(0.7),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.appGreen.withOpacity(0.3),
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: CircleAvatar(
+                                radius: 30,
+                                backgroundColor: Colors.transparent,
+                                backgroundImage: userAvatar.isNotEmpty
+                                    ? NetworkImage(userAvatar)
+                                    : null,
+                                child: userAvatar.isEmpty
+                                    ? Icon(
+                                        Icons.person,
+                                        size: 35,
+                                        color: Colors.white,
+                                      )
+                                    : null,
+                              ),
+                            ),
+                            SizedBox(width: AppSizer().width4),
+                            // Enhanced User Info
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.account_circle,
+                                        color: AppColors.appGreen,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 6),
+                                      Expanded(
+                                        child: isProfileLoading
+                                            ? Row(
+                                                children: [
+                                                  SizedBox(
+                                                    width: 12,
+                                                    height: 12,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 1.5,
+                                                          color: AppColors
+                                                              .appGreen,
+                                                        ),
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Text(
+                                                    'Loading profile...',
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          AppSizer().fontSize14,
+                                                      fontStyle:
+                                                          FontStyle.italic,
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              )
+                                            : Text(
+                                                userName,
+                                                style: TextStyle(
+                                                  fontSize:
+                                                      AppSizer().fontSize17,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors
+                                                      .appGreen
+                                                      .shade800,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 4),
+
+                                  // Show dealer badge if it's a dealer profile
+                                  Obx(() {
+                                    final isDealerProfile =
+                                        controller.isDealer.value ||
+                                        userName.contains('Dealer') ||
+                                        userName.contains('Business') ||
+                                        userName.contains('Store') ||
+                                        userName.contains('Shop') ||
+                                        productCount >
+                                            5; // If seller has many products, likely a dealer
+
+                                    return isDealerProfile
+                                        ? Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange.shade100,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: Colors.orange.shade300,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.verified_user,
+                                                  size: 12,
+                                                  color: Colors.orange.shade700,
+                                                ),
+                                                SizedBox(width: 3),
+                                                Text(
+                                                  'Dealer',
+                                                  style: TextStyle(
+                                                    fontSize:
+                                                        AppSizer().fontSize12,
+                                                    color:
+                                                        Colors.orange.shade700,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          )
+                                        : SizedBox.shrink();
+                                  }),
+
+                                  SizedBox(height: 6),
+
+                                  // Enhanced stats row
+                                  if (productCount > 0 || videoCount > 0)
+                                    Row(
+                                      children: [
+                                        if (productCount > 0) ...[
+                                          Icon(
+                                            Icons.inventory,
+                                            size: 14,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          SizedBox(width: 3),
+                                          Text(
+                                            '$productCount products',
+                                            style: TextStyle(
+                                              fontSize: AppSizer().fontSize12,
+                                              color: Colors.grey.shade600,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                        if (productCount > 0 && videoCount > 0)
+                                          Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                            ),
+                                            child: Text(
+                                              '•',
+                                              style: TextStyle(
+                                                color: Colors.grey.shade400,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        if (videoCount > 0) ...[
+                                          Icon(
+                                            Icons.videocam,
+                                            size: 14,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          SizedBox(width: 3),
+                                          Text(
+                                            '$videoCount videos',
+                                            style: TextStyle(
+                                              fontSize: AppSizer().fontSize12,
+                                              color: Colors.grey.shade600,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+
+                                  SizedBox(height: 4),
+                                  Text(
+                                    "View full user details",
+                                    style: TextStyle(
+                                      fontSize: AppSizer()
+                                          .fontSize15, // Slightly smaller - reduced to fontSize15
+                                      color: Colors.grey.shade600,
+                                      fontStyle: FontStyle.italic,
+                                      fontWeight: FontWeight
+                                          .w500, // Added slight bold weight
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Enhanced arrow with background
+                            Container(
+                              padding: EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.appGreen.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.arrow_forward_ios,
+                                color: AppColors.appGreen,
+                                size: 16,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   }),
@@ -355,12 +957,13 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
                             }),
 
                             IconButton(
-                              onPressed: () {
-                                Get.bottomSheet(
-                                  ShareBottomSheet(productId: product.id),
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
+                              onPressed: () async {
+                                print(
+                                  '[Share] 📤 Share button pressed for product: ${product.title}',
                                 );
+
+                                // Show share dialog with multiple options
+                                await _shareProductDirectly(product);
                               },
                               icon: Icon(Icons.share),
                             ),
@@ -520,14 +1123,115 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
                         Expanded(
                           child: InkWell(
                             onTap: () async {
+                              print(
+                                '[Call] 🔥 CALL BUTTON PRESSED - Starting process...',
+                              );
+
+                              // Check if call functionality is available
+                              try {
+                                final testUri = Uri.parse('tel:+919999999999');
+                                final canCall = await canLaunchUrl(testUri);
+                                print(
+                                  '[Call] Device can launch tel: URLs: $canCall',
+                                );
+                              } catch (e) {
+                                print(
+                                  '[Call] Call capability check failed: $e',
+                                );
+                              }
+
+                              // Show loading
+                              Get.snackbar(
+                                '📞 Getting Phone Number...',
+                                'Please wait while we fetch contact details',
+                              );
+
                               await controller.ensureUploaderContact();
+
                               // Prefer uploader phone resolved by controller, else fallback
-                              final phoneNumber =
+                              String phoneNumber =
                                   controller.uploaderPhone.value.isNotEmpty
                                   ? controller.uploaderPhone.value
                                   : (controller.product.value?.phoneNumber ??
                                         controller.product.value?.whatsapp ??
                                         "");
+
+                              // 🔥 Enhanced debug logging
+                              print(
+                                '[Call] ========== CALL DEBUG INFO ==========',
+                              );
+                              print(
+                                '[Call] Product ID: ${controller.product.value?.id}',
+                              );
+                              print(
+                                '[Call] Product userId: ${controller.product.value?.userId}',
+                              );
+                              print(
+                                '[Call] Product phoneNumber: ${controller.product.value?.phoneNumber}',
+                              );
+                              print(
+                                '[Call] Product whatsapp: ${controller.product.value?.whatsapp}',
+                              );
+                              print(
+                                '[Call] Controller uploaderPhone: ${controller.uploaderPhone.value}',
+                              );
+                              print(
+                                '[Call] Controller uploaderWhatsApp: ${controller.uploaderWhatsApp.value}',
+                              );
+                              print(
+                                '[Call] Initial phone to call: "$phoneNumber"',
+                              );
+
+                              // 🔥 EMERGENCY FALLBACK: If still no phone, try direct resolution
+                              if (phoneNumber.isEmpty &&
+                                  controller.product.value?.userId != null) {
+                                print(
+                                  '[Call] 🚨 EMERGENCY: No phone found, trying PhoneResolverService...',
+                                );
+                                Get.snackbar(
+                                  '🔍 Searching...',
+                                  'Trying alternative methods to find contact',
+                                );
+
+                                final emergencyPhone =
+                                    await PhoneResolverService.resolvePhoneForUser(
+                                      controller.product.value!.userId!,
+                                    );
+
+                                if (emergencyPhone != null &&
+                                    emergencyPhone.isNotEmpty) {
+                                  phoneNumber = emergencyPhone;
+                                  print(
+                                    '[Call] 🎉 EMERGENCY SUCCESS: Found phone: $phoneNumber',
+                                  );
+                                  Get.snackbar(
+                                    '✅ Found!',
+                                    'Contact number retrieved successfully',
+                                  );
+                                } else {
+                                  print(
+                                    '[Call] 💥 EMERGENCY FAILED: Still no phone found',
+                                  );
+                                }
+                              }
+
+                              print(
+                                '[Call] Final phone to call: "$phoneNumber"',
+                              );
+                              print(
+                                '[Call] ====================================',
+                              );
+
+                              if (phoneNumber.isEmpty ||
+                                  phoneNumber == "null") {
+                                Get.snackbar(
+                                  '❌ No Phone Number',
+                                  'Contact number not available for this product.\nTry contacting through WhatsApp instead.',
+                                  duration: Duration(seconds: 4),
+                                );
+                                return;
+                              }
+
                               await _openDialer(phoneNumber);
                             },
                             child: Container(
@@ -553,26 +1257,83 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
 
                         SizedBox(width: AppSizer().width3),
 
-                        // WhatsApp
+                        // WhatsApp - Direct messaging to seller
                         Expanded(
                           child: InkWell(
                             onTap: () async {
+                              print(
+                                '[WhatsApp] � Direct seller messaging started...',
+                              );
+
+                              // Show loading
+                              Get.snackbar(
+                                '� Opening WhatsApp',
+                                'Connecting to seller for direct messaging...',
+                                backgroundColor: Colors.green,
+                                colorText: Colors.white,
+                                duration: const Duration(seconds: 2),
+                              );
+
                               await controller.ensureUploaderContact();
+
+                              // Get seller's phone number (same as call button)
+                              String phoneNumber =
+                                  controller.uploaderPhone.value.isNotEmpty
+                                  ? controller.uploaderPhone.value
+                                  : (controller.product.value?.phoneNumber ??
+                                        controller.product.value?.whatsapp ??
+                                        "");
+
+                              print('[WhatsApp] 📞 Seller phone: $phoneNumber');
+
+                              // Emergency fallback
+                              if (phoneNumber.isEmpty &&
+                                  controller.product.value?.userId != null) {
+                                final emergencyPhone =
+                                    await PhoneResolverService.resolvePhoneForUser(
+                                      controller.product.value!.userId!,
+                                    );
+
+                                if (emergencyPhone != null &&
+                                    emergencyPhone.isNotEmpty) {
+                                  phoneNumber = emergencyPhone;
+                                  print(
+                                    '[WhatsApp] ✅ Emergency contact found: $phoneNumber',
+                                  );
+                                }
+                              }
+
                               final prod = controller.product.value;
-                              final shareUrl =
-                                  "http://oldmarket.bhoomi.cloud/product/${prod?.id ?? widget.productId}";
-                              final message =
-                                  "Hi, I'm interested in this product: ${prod?.title ?? ''}\n$shareUrl";
-                              final phone =
-                                  controller.uploaderWhatsApp.value.isNotEmpty
-                                  ? controller.uploaderWhatsApp.value
-                                  : (prod?.phoneNumber ?? prod?.whatsapp ?? '');
-                              // Open direct WhatsApp chat with uploader's number if available,
-                              // otherwise fallback to share-to-any-contact.
-                              if (phone.isNotEmpty) {
-                                await _openWhatsAppChat(phone, message);
+
+                              // Create direct messaging text (buyer to seller)
+                              String message =
+                                  "Hi! 👋 I'm interested in your product:\n\n";
+                              message += "🛍️ *${prod?.title ?? 'Product'}*\n";
+                              if (prod?.price != null) {
+                                message += "💰 Price: ₹${prod!.price}\n";
+                              }
+                              message +=
+                                  "\nIs this still available? I'd like to know more details.\n";
+                              message += "Thank you! 😊";
+
+                              // Direct WhatsApp chat with seller
+                              if (phoneNumber.isNotEmpty &&
+                                  phoneNumber != "null") {
+                                print(
+                                  '[WhatsApp] 🎯 Opening direct chat with seller: $phoneNumber',
+                                );
+                                await _openWhatsAppChat(phoneNumber, message);
                               } else {
-                                await _shareOnWhatsApp(message);
+                                print(
+                                  '[WhatsApp] ❌ No seller contact available',
+                                );
+                                Get.snackbar(
+                                  '❌ No Contact Available',
+                                  'Seller contact information not available for direct messaging.',
+                                  backgroundColor: Colors.red,
+                                  colorText: Colors.white,
+                                  duration: Duration(seconds: 4),
+                                );
                               }
                             },
                             child: Container(
@@ -585,7 +1346,7 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    "Go To Whatsapp",
+                                    "WhatsApp Chat",
                                     style: TextStyle(color: AppColors.appWhite),
                                   ),
                                   SizedBox(width: AppSizer().width3),
@@ -893,6 +1654,9 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
                           productImage: product.mediaUrl.isNotEmpty
                               ? product.mediaUrl[0]
                               : null,
+                          initialMessage:
+                              "Hi, I'm interested in your ${product.title}. Is it still available?",
+                          sellerName: prodUserId,
                         );
                       },
                       child: Container(

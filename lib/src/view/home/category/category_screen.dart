@@ -6,41 +6,83 @@ import '../../../controller/category_controller.dart';
 import '../../../controller/token_controller.dart';
 import '../../../utils/app_routes.dart';
 
-class CategoryScreen extends StatelessWidget {
+class CategoryScreen extends StatefulWidget {
   CategoryScreen({super.key});
-  final CategoryController controller = Get.put(CategoryController());
 
+  @override
+  State<CategoryScreen> createState() => _CategoryScreenState();
+}
+
+class _CategoryScreenState extends State<CategoryScreen>
+    with SingleTickerProviderStateMixin {
+  final CategoryController controller = Get.put(CategoryController());
   final List<String> categories = ['all', 'cars', 'two-wheeler', 'others'];
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
+  }
+
+  @override
+  void dispose() {
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    // Update the controller based on tab index
+    final newTab = _tabController.index == 0 ? 'user' : 'dealer';
+    if (controller.selectedTab.value != newTab) {
+      controller.selectedTab.value = newTab;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: AppColors.appGreen,
-          centerTitle: true,
-          iconTheme: IconThemeData(color: AppColors.appWhite),
-          title: Text("Category", style: TextStyle(color: AppColors.appWhite)),
-          bottom: TabBar(
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: [
-              Tab(text: "User"),
-              Tab(text: "Dealer"),
-            ],
-            // Tab switch handled by DefaultTabController; no navigation here
-          ),
-        ),
-        body: Column(
-          children: [
-            SizedBox(height: AppSizer().height1),
-            _buildCategoryFilter(),
-            SizedBox(height: AppSizer().height1),
-            Expanded(child: _buildProductList()),
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: AppColors.appGreen,
+        centerTitle: true,
+        iconTheme: IconThemeData(color: AppColors.appWhite),
+        title: Text("Category", style: TextStyle(color: AppColors.appWhite)),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          tabs: [
+            Tab(text: "User"),
+            Tab(text: "Dealer"),
           ],
         ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // User tab
+          Column(
+            children: [
+              SizedBox(height: AppSizer().height1),
+              _buildCategoryFilter(),
+              SizedBox(height: AppSizer().height1),
+              Expanded(child: _buildProductList()),
+            ],
+          ),
+          // Dealer tab
+          Column(
+            children: [
+              SizedBox(height: AppSizer().height1),
+              _buildCategoryFilter(),
+              SizedBox(height: AppSizer().height1),
+              Expanded(child: _buildProductList()),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -59,8 +101,8 @@ class CategoryScreen extends StatelessWidget {
                 label: Text(cat.capitalizeFirst ?? cat),
                 selected: isSelected,
                 onSelected: (_) {
-                  controller.selectedCategory.value = cat;
-                  controller.fetchProducts();
+                  // Use optimized filtering method
+                  controller.filterByCategory(cat);
                 },
                 selectedColor: AppColors.appGreen,
                 backgroundColor: Colors.grey.shade300,
@@ -88,16 +130,19 @@ class CategoryScreen extends StatelessWidget {
         return Center(child: Text("No products found"));
       }
 
-      return GridView.builder(
-        padding: EdgeInsets.all(6),
-        itemCount: controller.productList.length,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 4,
-          mainAxisSpacing: 8,
-          childAspectRatio: 0.63,
-        ),
-        itemBuilder: (context, index) {
+      return RefreshIndicator(
+        color: AppColors.appGreen,
+        onRefresh: () => controller.refreshData(),
+        child: GridView.builder(
+          padding: EdgeInsets.all(6),
+          itemCount: controller.productList.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 4,
+            mainAxisSpacing: 8,
+            childAspectRatio: 0.63,
+          ),
+          itemBuilder: (context, index) {
           final item = controller.productList[index];
           final isUser = controller.selectedTab.value == 'user';
           final imageList = isUser ? item['mediaUrl'] : item['images'];
@@ -218,12 +263,13 @@ class CategoryScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ),
+                ),
                 ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       );
     });
   }

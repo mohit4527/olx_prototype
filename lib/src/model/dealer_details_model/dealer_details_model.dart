@@ -45,6 +45,7 @@ class DealerProduct {
   final String description;
   final int price;
   final List images;
+  final List<String>? tags; // Made nullable to avoid type errors
   final List<Offer> offers;
 
   DealerProduct({
@@ -53,11 +54,27 @@ class DealerProduct {
     required this.description,
     required this.price,
     required this.images,
+    this.tags, // Now optional
     required this.offers,
   });
 
   factory DealerProduct.fromJson(Map<String, dynamic> json) {
     print("🚗 DealerProduct JSON: $json");
+
+    // Safe tags parsing with multiple fallbacks
+    List<String> safeTags = [];
+    try {
+      if (json["tags"] != null) {
+        if (json["tags"] is List) {
+          safeTags = List<String>.from(json["tags"].map((x) => x.toString()));
+        } else {
+          safeTags = [];
+        }
+      }
+    } catch (e) {
+      print("⚠️ Error parsing tags: $e");
+      safeTags = [];
+    }
 
     return DealerProduct(
       id: json["_id"]?.toString() ?? "",
@@ -65,7 +82,10 @@ class DealerProduct {
       description: json["description"]?.toString() ?? "",
       price: json["price"] ?? 0,
       images: json["images"] ?? [],
-      offers: (json["offers"] ?? []).map<Offer>((e) => Offer.fromJson(e)).toList(),
+      tags: safeTags,
+      offers: (json["offers"] ?? [])
+          .map<Offer>((e) => Offer.fromJson(e))
+          .toList(),
     );
   }
 }
@@ -94,14 +114,25 @@ class DealerModel {
   });
 
   factory DealerModel.fromJson(Map<String, dynamic> json) {
-    final image = json['image'] ?? json['avatar'] ?? json['photo'] ?? json['businessLogo'] ?? json['logo'];
+    final image =
+        json['image'] ??
+        json['avatar'] ??
+        json['photo'] ??
+        json['businessLogo'] ??
+        json['logo'];
 
     print("📦 DealerModel JSON: $json");
     print("🔍 DealerModel image=$image");
 
     return DealerModel(
-      dealerId: (json['_id'] ?? json['dealerId'] ?? json['id'] ?? '').toString(),
-      businessName: (json['businessName'] ?? json['business_name'] ?? json['name'] ?? 'Unknown').toString(),
+      dealerId: (json['_id'] ?? json['dealerId'] ?? json['id'] ?? '')
+          .toString(),
+      businessName:
+          (json['businessName'] ??
+                  json['business_name'] ??
+                  json['name'] ??
+                  'Unknown')
+              .toString(),
       image: image?.toString(),
       phone: (json['phone'] ?? json['contact'])?.toString(),
     );

@@ -14,11 +14,39 @@ import '../../../custom_widgets/dealer_screen_widgets.dart';
 class EditDealerProfilePage extends StatelessWidget {
   EditDealerProfilePage({super.key});
 
-  final EditDealerProfileController controller =
-      Get.find<EditDealerProfileController>();
-
   @override
   Widget build(BuildContext context) {
+    final arguments = Get.arguments;
+    print(
+      "🎯 [EditDealerProfileScreen] Building screen - arguments: $arguments",
+    );
+
+    // 🔥 Delete any existing controller first
+    if (Get.isRegistered<EditDealerProfileController>()) {
+      Get.delete<EditDealerProfileController>();
+      print("🗑️ [EditDealerProfileScreen] Deleted existing controller");
+    }
+
+    // Create fresh controller and pass arguments manually if available
+    final EditDealerProfileController controller = Get.put(
+      EditDealerProfileController(),
+      permanent: false,
+    );
+
+    // 🔥 Manually load arguments if available
+    if (arguments != null && arguments is Map<String, dynamic>) {
+      print(
+        "🚀 [EditDealerProfileScreen] Manually triggering data load with arguments",
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Future.delayed(
+          Duration(milliseconds: 100),
+        ); // Small delay for controller setup
+        controller.loadDataFromArguments(arguments);
+      });
+    }
+
+    print("✅ [EditDealerProfileScreen] Controller setup completed");
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -32,7 +60,11 @@ class EditDealerProfilePage extends StatelessWidget {
           ),
         ),
         leading: IconButton(
-          onPressed: () => Get.back(),
+          onPressed: () {
+            // 🔥 Navigate to home screen with drawer opened
+            print('🏠 [EditDealerProfile] Back button pressed - navigating to home with drawer');
+            Get.offAllNamed(AppRoutes.home, arguments: {'openDrawer': true});
+          },
           icon: Icon(Icons.arrow_back, color: AppColors.appWhite),
         ),
         centerTitle: true,
@@ -167,16 +199,6 @@ class EditDealerProfilePage extends StatelessWidget {
                 "Registration Number",
                 Icon(Icons.pin),
                 controller: controller.regNoController,
-              ),
-              AppCustomWidgets.buildTextField(
-                "GST Number",
-                Icon(Icons.pin),
-                controller: controller.gstNoController,
-              ),
-              AppCustomWidgets.buildTextField(
-                "Village",
-                Icon(Icons.location_city),
-                controller: controller.villageController,
               ),
               AppCustomWidgets.buildTextField(
                 "City",
@@ -462,6 +484,34 @@ class EditDealerProfilePage extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+
+              SizedBox(height: AppSizer().height2),
+
+              /// -------- DEBUG Button --------
+              Center(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    padding: EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+                  ),
+                  onPressed: () async {
+                    // 🔥 Show comprehensive form data debug
+                    controller.debugCompleteFormData();
+                    await controller.debugSharedPreferences();
+                    Get.snackbar(
+                      "Debug Complete ✅",
+                      "Check console for COMPLETE form data analysis",
+                      backgroundColor: Colors.green,
+                      colorText: Colors.white,
+                      duration: Duration(seconds: 3),
+                    );
+                  },
+                  child: Text(
+                    "🔍 DEBUG: Complete Data",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
               ),
             ],
           ),

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -19,6 +18,7 @@ import '../../model/all_product_model/all_product_model.dart';
 import '../../model/book_test_drive_model/book_test_drive_model.dart';
 import '../../model/book_test_drivescreen_model/book_test_drive_screen_model.dart';
 import '../../model/challan_model/challan_model.dart';
+import 'dart:convert';
 import '../../model/chat_model/chat_model.dart';
 import '../../model/dealer_product_model/dealer_product_model.dart';
 import '../../model/fuel_model/fuel_model.dart';
@@ -28,6 +28,8 @@ import '../../model/sell_dealer_car_model/sell_dealer_car_model.dart';
 import '../../model/sell_user_car_model/sell_car_model.dart';
 import '../../model/user_desler_products/user_dealer_product_model.dart';
 import '../../model/user_offermodel/user_offermodel.dart';
+import '../../model/dashboard_ads_model/dashboard_ads_model.dart';
+import '../../model/dealer_profiles_model/dealer_profiles_model.dart';
 
 class ApiService {
   /// Last error message from API calls (helpful for UI and debugging)
@@ -67,10 +69,188 @@ class ApiService {
       final body = jsonDecode(response.body);
 
       if (body['status'] == true) {
+        // 🔥 DEBUG: Log API response to see what phone data is actually returned
+        print('[ApiService] fetchProductById - Raw API Response:');
+        print(jsonEncode(body['data']));
+
+        // Check for phone data in different locations
+        final productData = body['data'];
+        print('[ApiService] 🔥 API PHONE FIELDS DEBUG:');
+        print('[ApiService] number: ${productData['number']}'); // Primary field
+        print('[ApiService] phoneNumber: ${productData['phoneNumber']}');
+        print('[ApiService] phone: ${productData['phone']}');
+        print('[ApiService] whatsapp: ${productData['whatsapp']}');
+        print('[ApiService] User phone: ${productData['user']?['phone']}');
+        print(
+          '[ApiService] Uploader phone: ${productData['uploader']?['phone']}',
+        );
+        print('[ApiService] UserId: ${productData['userId']}');
+
         return ProductModel.fromJson(body['data']);
       }
     }
     return null;
+  }
+
+  // Get uploader phone number by userId (simple endpoint)
+  static Future<String?> getUploaderPhone(String userId) async {
+    try {
+      // Try simple endpoints first
+      final endpoints = [
+        "https://oldmarket.bhoomi.cloud/api/users/$userId/phone",
+        "http://oldmarket.bhoomi.cloud/api/users/$userId/phone",
+        "https://oldmarket.bhoomi.cloud/api/user/$userId/contact",
+        "http://oldmarket.bhoomi.cloud/api/user/$userId/contact",
+      ];
+
+      for (final endpoint in endpoints) {
+        try {
+          final response = await http.get(Uri.parse(endpoint));
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final phone =
+                data['phone'] ?? data['phoneNumber'] ?? data['contact'];
+            if (phone != null) return phone.toString();
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+      return null;
+    } catch (e) {
+      print('[ApiService] getUploaderPhone error: $e');
+      return null;
+    }
+  }
+
+  /// Fetch dashboard ads for carousel slider
+  static Future<DashboardAdsModel?> fetchDashboardAds() async {
+    try {
+      print('📡 [ApiService] Fetching dashboard ads...');
+      const url = 'https://oldmarket.bhoomi.cloud/api/dashboard-ads/all';
+
+      final response = await http.get(Uri.parse(url));
+
+      print('📊 [ApiService] Dashboard ads status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        print('📋 [ApiService] Dashboard ads response: ${response.body}');
+        return dashboardAdsModelFromJson(response.body);
+      } else {
+        print('❌ [ApiService] Dashboard ads error: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('💥 [ApiService] Dashboard ads exception: $e');
+      return null;
+    }
+  }
+
+  /// Fetch all dealer profiles for detailed information
+  static Future<DealerProfilesModel?> fetchDealerProfiles() async {
+    try {
+      print('📡 [ApiService] Fetching dealer profiles...');
+      const url = 'https://oldmarket.bhoomi.cloud/api/dealers/profiles';
+
+      final response = await http.get(Uri.parse(url));
+
+      print('📊 [ApiService] Dealer profiles status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        print(
+          '📋 [ApiService] Dealer profiles response length: ${response.body.length}',
+        );
+        return dealerProfilesModelFromJson(response.body);
+      } else {
+        print('❌ [ApiService] Dealer profiles error: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('💥 [ApiService] Dealer profiles exception: $e');
+      return null;
+    }
+  }
+
+  /// 🔥 NEW: Check if current user has a dealer profile
+  static Future<bool> checkUserHasDealerProfile(String userId) async {
+    try {
+      print(
+        '🔍 [ApiService] checkUserHasDealerProfile() called for userId: $userId',
+      );
+
+      // Fetch all dealer profiles
+      final dealerProfilesModel = await fetchDealerProfiles();
+
+      if (dealerProfilesModel?.data != null &&
+          dealerProfilesModel!.data!.isNotEmpty) {
+        print(
+          '📊 [ApiService] Found ${dealerProfilesModel.data!.length} total dealer profiles',
+        );
+
+        // Check if any profile belongs to current user
+        bool hasProfile = false;
+        for (final profile in dealerProfilesModel.data!) {
+          if (profile.userId == userId) {
+            hasProfile = true;
+            print(
+              '✅ [ApiService] Found matching profile - ID: ${profile.id}, BusinessName: ${profile.businessName}',
+            );
+            break;
+          }
+        }
+
+        if (!hasProfile) {
+          print('❌ [ApiService] No profile found for userId: $userId');
+          // Debug: print all userIds to see what's available
+          final allUserIds = dealerProfilesModel.data!
+              .map((p) => p.userId)
+              .toList();
+          print('🔍 [ApiService] Available userIds in profiles: $allUserIds');
+        }
+
+        print(
+          '🏁 [ApiService] Final result - User $userId has dealer profile: $hasProfile',
+        );
+        return hasProfile;
+      }
+
+      print('❌ [ApiService] No dealer profiles found or empty data');
+      return false;
+    } catch (e) {
+      print('💥 [ApiService] Check dealer profile exception: $e');
+      return false;
+    }
+  }
+
+  /// 🔥 NEW: Get current user's dealer profile
+  static Future<DealerProfile?> getCurrentUserDealerProfile(
+    String userId,
+  ) async {
+    try {
+      print('🔍 [ApiService] Getting dealer profile for userId: $userId');
+
+      // Fetch all dealer profiles
+      final dealerProfilesModel = await fetchDealerProfiles();
+
+      if (dealerProfilesModel?.data != null) {
+        // Find profile for current user
+        final userProfile = dealerProfilesModel!.data!.firstWhere(
+          (profile) => profile.userId == userId,
+          orElse: () => DealerProfile(),
+        );
+
+        if (userProfile.id != null) {
+          print('✅ [ApiService] Found dealer profile for user $userId');
+          return userProfile;
+        }
+      }
+
+      print('❌ [ApiService] No dealer profile found for user $userId');
+      return null;
+    } catch (e) {
+      print('💥 [ApiService] Get dealer profile exception: $e');
+      return null;
+    }
   }
 
   //ShortVideos ApiService
@@ -436,75 +616,159 @@ class ApiService {
   // -------------------- SELL USER PRODUCTS ----------------------
   static Future<void> uploadCar(SellUserCarModel car, List<File> images) async {
     print("Sending userId: ${car.userId}");
-    final uri = Uri.parse('http://oldmarket.bhoomi.cloud/api/products');
-    final request = http.MultipartRequest('POST', uri);
 
-    // Required fields
-    request.fields['title'] = car.title;
-    request.fields['description'] = car.description;
-    request.fields['price'] = car.price.toString();
-    request.fields['type'] = car.type;
-    request.fields['userId'] = car.userId;
-    request.fields['category'] = car.category;
-    request.fields['location'] = jsonEncode({
-      'country': car.location.country,
-      'state': car.location.state,
-      'city': car.location.city,
-    });
+    // 🔹 Retry mechanism for network issues
+    const int maxRetries = 3;
+    const Duration retryDelay = Duration(seconds: 2);
 
-    if (car.dealerType != null) {
-      request.fields['dealerType'] = car.dealerType!;
-    }
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        print("Upload attempt $attempt of $maxRetries");
 
-    // 🔹 Attach images
-    for (final img in images) {
-      final compressed = await compressImage(img);
-      final fileToSend = compressed ?? img;
-      final mimeType = lookupMimeType(fileToSend.path) ?? 'image/jpeg';
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'images',
-          fileToSend.path,
-          contentType: MediaType.parse(mimeType),
-        ),
-      );
-    }
+        final uri = Uri.parse('http://oldmarket.bhoomi.cloud/api/products');
+        final request = http.MultipartRequest('POST', uri);
 
-    // 🔹 Send request
-    try {
-      final streamed = await request.send();
-      final resp = await http.Response.fromStream(streamed);
-      print('Upload status: ${resp.statusCode} body: ${resp.body}');
+        // Set timeout for the request
+        // Note: MultipartRequest doesn't have direct timeout, but we can use Future.timeout
 
-      final responseData = jsonDecode(resp.body);
+        // Required fields
+        request.fields['title'] = car.title;
+        request.fields['description'] = car.description;
+        request.fields['price'] = car.price.toString();
+        request.fields['type'] = car.type;
+        request.fields['userId'] = car.userId;
+        request.fields['category'] = car.category;
+        request.fields['number'] =
+            car.phoneNumber; // 🔥 Backend expects "number" field
+        request.fields['phoneNumber'] = car.phoneNumber; // 🔥 Backup field
+        request.fields['location'] = jsonEncode({
+          'country': car.location.country,
+          'state': car.location.state,
+          'city': car.location.city,
+        });
 
-      if (resp.statusCode == 200 || resp.statusCode == 201) {
-        if (responseData['status'] == true) {
-          Get.snackbar(
-            "Success",
-            responseData['message'] ?? "Product uploaded successfully",
-            backgroundColor: AppColors.appGreen,
-            colorText: AppColors.appWhite,
+        // 🔥 DEBUG: Upload API fields
+        print('[ApiService] uploadCar - Title: "${car.title}"');
+        print('[ApiService] uploadCar - PhoneNumber: "${car.phoneNumber}"');
+        print(
+          '[ApiService] uploadCar - number field: "${request.fields['number']}"',
+        );
+        print(
+          '[ApiService] uploadCar - phoneNumber field: "${request.fields['phoneNumber']}"',
+        );
+        print('[ApiService] uploadCar - All fields: ${request.fields}');
+
+        if (car.dealerType != null) {
+          request.fields['dealerType'] = car.dealerType!;
+        }
+
+        // 🔹 Attach images
+        for (final img in images) {
+          final compressed = await compressImage(img);
+          final fileToSend = compressed ?? img;
+          final mimeType = lookupMimeType(fileToSend.path) ?? 'image/jpeg';
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'images',
+              fileToSend.path,
+              contentType: MediaType.parse(mimeType),
+            ),
           );
+        }
+
+        // 🔹 Send request with timeout
+        final streamed = await request.send().timeout(
+          const Duration(seconds: 60), // 60 second timeout
+          onTimeout: () {
+            throw TimeoutException(
+              'Upload request timed out',
+              const Duration(seconds: 60),
+            );
+          },
+        );
+
+        final resp = await http.Response.fromStream(streamed);
+        print('Upload status: ${resp.statusCode} body: ${resp.body}');
+
+        final responseData = jsonDecode(resp.body);
+
+        if (resp.statusCode == 200 || resp.statusCode == 201) {
+          if (responseData['status'] == true) {
+            Get.snackbar(
+              "Success",
+              responseData['message'] ?? "Product uploaded successfully",
+              backgroundColor: AppColors.appGreen,
+              colorText: AppColors.appWhite,
+            );
+            return; // Success, exit retry loop
+          } else {
+            Get.snackbar(
+              "Error",
+              responseData['message'] ?? "Upload failed",
+              backgroundColor: AppColors.appRed,
+              colorText: AppColors.appWhite,
+            );
+            return; // Server responded with error, don't retry
+          }
         } else {
+          // Server error, might be worth retrying
+          if (attempt == maxRetries) {
+            Get.snackbar(
+              "Error",
+              responseData['message'] ??
+                  "Something went wrong after $maxRetries attempts",
+              backgroundColor: AppColors.appRed,
+              colorText: AppColors.appWhite,
+            );
+          } else {
+            print(
+              "Server error (${resp.statusCode}), retrying in ${retryDelay.inSeconds} seconds...",
+            );
+            await Future.delayed(retryDelay);
+          }
+        }
+      } catch (e) {
+        print("Error during upload attempt $attempt: $e");
+
+        // Check if this is a network-related error that might benefit from retry
+        bool shouldRetry =
+            e is SocketException ||
+            e is TimeoutException ||
+            e.toString().contains('Broken pipe') ||
+            e.toString().contains('Connection reset') ||
+            e.toString().contains('timeout');
+
+        if (shouldRetry && attempt < maxRetries) {
+          print(
+            "Network error detected, retrying in ${retryDelay.inSeconds} seconds...",
+          );
+          Get.snackbar(
+            "Retry",
+            "Upload failed (attempt $attempt/$maxRetries). Retrying...",
+            backgroundColor: Colors.orange,
+            colorText: AppColors.appWhite,
+            duration: Duration(seconds: retryDelay.inSeconds),
+          );
+          await Future.delayed(retryDelay);
+        } else {
+          // Final failure or non-retryable error
+          String errorMessage = "Failed to upload product";
+          if (e is SocketException || e.toString().contains('Broken pipe')) {
+            errorMessage =
+                "Network connection failed. Please check your internet connection.";
+          } else if (e is TimeoutException) {
+            errorMessage = "Upload timed out. Please try again.";
+          }
+
           Get.snackbar(
             "Error",
-            responseData['message'] ?? "Upload failed",
+            "$errorMessage (After $attempt attempts)",
             backgroundColor: AppColors.appRed,
             colorText: AppColors.appWhite,
           );
+          return;
         }
-      } else {
-        Get.snackbar(
-          "Error",
-          responseData['message'] ?? "Something went wrong",
-          backgroundColor: AppColors.appRed,
-          colorText: AppColors.appWhite,
-        );
       }
-    } catch (e) {
-      print("Error during upload: $e");
-      Get.snackbar("Error", "Failed to upload product: $e");
     }
   }
 
@@ -513,70 +777,139 @@ class ApiService {
     DealerCarModel car,
     List<File> images,
   ) async {
-    final uri = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/cars/dealer/upload',
-    );
+    // 🔹 Retry mechanism for network issues
+    const int maxRetries = 3;
+    const Duration retryDelay = Duration(seconds: 2);
 
-    final request = http.MultipartRequest('POST', uri);
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        print("Dealer car upload attempt $attempt of $maxRetries");
 
-    //Required fields
-    request.fields['title'] = car.title;
-    request.fields['description'] = car.description;
-    request.fields['price'] = car.price.toString();
-    request.fields['sellerType'] = car.sellerType;
-    request.fields['dealerId'] = car.dealerId;
-    request.fields['userId'] = car.userId;
-    request.fields['tags'] = jsonEncode(car.tags);
-    request.fields['category'] = car.category;
+        final uri = Uri.parse(
+          'http://oldmarket.bhoomi.cloud/api/cars/dealer/upload',
+        );
 
-    // Attach images
-    for (final img in images) {
-      final compressed = await compressImage(img);
-      final fileToSend = compressed ?? img;
-      final mimeType = lookupMimeType(fileToSend.path) ?? 'image/jpeg';
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'images',
-          fileToSend.path,
-          contentType: MediaType.parse(mimeType),
-        ),
-      );
-    }
+        final request = http.MultipartRequest('POST', uri);
 
-    try {
-      final streamed = await request.send();
-      final resp = await http.Response.fromStream(streamed);
-      print('Dealer Car Upload status: ${resp.statusCode} body: ${resp.body}');
+        //Required fields
+        request.fields['title'] = car.title;
+        request.fields['description'] = car.description;
+        request.fields['price'] = car.price.toString();
+        request.fields['sellerType'] = car.sellerType;
+        request.fields['dealerId'] = car.dealerId;
+        request.fields['userId'] = car.userId;
+        request.fields['tags'] = jsonEncode(car.tags);
+        request.fields['category'] = car.category;
 
-      final responseData = jsonDecode(resp.body);
-
-      if (resp.statusCode == 200 || resp.statusCode == 201) {
-        if (responseData['status'] == true) {
-          Get.snackbar(
-            "Success",
-            responseData['message'] ?? "Car uploaded successfully",
-            backgroundColor: AppColors.appGreen,
-            colorText: AppColors.appWhite,
+        // Attach images
+        for (final img in images) {
+          final compressed = await compressImage(img);
+          final fileToSend = compressed ?? img;
+          final mimeType = lookupMimeType(fileToSend.path) ?? 'image/jpeg';
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'images',
+              fileToSend.path,
+              contentType: MediaType.parse(mimeType),
+            ),
           );
+        }
+
+        // 🔹 Send request with timeout
+        final streamed = await request.send().timeout(
+          const Duration(seconds: 60), // 60 second timeout
+          onTimeout: () {
+            throw TimeoutException(
+              'Dealer car upload request timed out',
+              const Duration(seconds: 60),
+            );
+          },
+        );
+
+        final resp = await http.Response.fromStream(streamed);
+        print(
+          'Dealer Car Upload status: ${resp.statusCode} body: ${resp.body}',
+        );
+
+        final responseData = jsonDecode(resp.body);
+
+        if (resp.statusCode == 200 || resp.statusCode == 201) {
+          if (responseData['status'] == true) {
+            Get.snackbar(
+              "Success",
+              responseData['message'] ?? "Car uploaded successfully",
+              backgroundColor: AppColors.appGreen,
+              colorText: AppColors.appWhite,
+            );
+            return; // Success, exit retry loop
+          } else {
+            Get.snackbar(
+              "Error",
+              responseData['message'] ?? "Upload failed",
+              backgroundColor: AppColors.appRed,
+              colorText: AppColors.appWhite,
+            );
+            return; // Server responded with error, don't retry
+          }
         } else {
+          // Server error, might be worth retrying
+          if (attempt == maxRetries) {
+            Get.snackbar(
+              "Error",
+              responseData['message'] ??
+                  "Something went wrong after $maxRetries attempts",
+              backgroundColor: AppColors.appRed,
+              colorText: AppColors.appWhite,
+            );
+          } else {
+            print(
+              "Server error (${resp.statusCode}), retrying in ${retryDelay.inSeconds} seconds...",
+            );
+            await Future.delayed(retryDelay);
+          }
+        }
+      } catch (e) {
+        print("Error during dealer car upload attempt $attempt: $e");
+
+        // Check if this is a network-related error that might benefit from retry
+        bool shouldRetry =
+            e is SocketException ||
+            e is TimeoutException ||
+            e.toString().contains('Broken pipe') ||
+            e.toString().contains('Connection reset') ||
+            e.toString().contains('timeout');
+
+        if (shouldRetry && attempt < maxRetries) {
+          print(
+            "Network error detected, retrying in ${retryDelay.inSeconds} seconds...",
+          );
+          Get.snackbar(
+            "Retry",
+            "Dealer car upload failed (attempt $attempt/$maxRetries). Retrying...",
+            backgroundColor: Colors.orange,
+            colorText: AppColors.appWhite,
+            duration: Duration(seconds: retryDelay.inSeconds),
+          );
+          await Future.delayed(retryDelay);
+        } else {
+          // Final failure or non-retryable error
+          String errorMessage = "Failed to upload dealer car";
+          if (e is SocketException || e.toString().contains('Broken pipe')) {
+            errorMessage =
+                "Network connection failed. Please check your internet connection.";
+          } else if (e is TimeoutException) {
+            errorMessage = "Upload timed out. Please try again.";
+          }
+
           Get.snackbar(
             "Error",
-            responseData['message'] ?? "Upload failed",
+            "$errorMessage (After $attempt attempts)",
             backgroundColor: AppColors.appRed,
             colorText: AppColors.appWhite,
           );
+          return;
         }
-      } else {
-        Get.snackbar(
-          "Error",
-          responseData['message'] ?? "Something went wrong",
-          backgroundColor: AppColors.appRed,
-          colorText: AppColors.appWhite,
-        );
       }
-    } catch (e) {
-      print("Error during dealer car upload: $e");
-      Get.snackbar("Error", "Failed to upload car: $e");
     }
   }
 
@@ -600,19 +933,30 @@ class ApiService {
   static const String _baseUrl = 'http://oldmarket.bhoomi.cloud/api/dealers';
 
   static Future<List<DealerProduct>> fetchDealerProducts() async {
-    final uri = Uri.parse('$_baseUrl/dealer/cars');
+    final uri = Uri.parse(
+      'http://oldmarket.bhoomi.cloud/api/dealers/dealer/cars',
+    );
+    print("📡 Fetching dealer products from: $uri");
     try {
       final response = await http.get(uri);
+      print("📊 Dealer Products API Status: ${response.statusCode}");
+      print("📋 Dealer Products Response: ${response.body}");
+
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
         final dealerProductModel = DealerProductModel.fromJson(jsonResponse);
+        print(
+          "✅ Dealer Products parsed: ${dealerProductModel.data.length} items",
+        );
         return dealerProductModel.data;
       } else {
+        print("❌ Dealer Products API failed: ${response.statusCode}");
         throw Exception(
           'Failed to load dealer products. Status code: ${response.statusCode}',
         );
       }
     } catch (e) {
+      print("💥 Dealer Products API error: $e");
       throw Exception('Error fetching dealer products: $e');
     }
   }
@@ -626,10 +970,16 @@ class ApiService {
     );
 
     try {
+      print("📡 Fetching dealer product by ID: $productId");
+      print("🌐 URL: $url");
       final response = await http.get(url);
+      print("📊 Description API Status: ${response.statusCode}");
+      print("📋 Description API Response: ${response.body}");
 
       if (response.statusCode == 200) {
-        return dealerProductDescriptionModelFromJson(response.body);
+        final parsed = dealerProductDescriptionModelFromJson(response.body);
+        print("✅ Description parsed - Phone: ${parsed.data?.phone}");
+        return parsed;
       } else {
         print('Failed to load dealer product: ${response.statusCode}');
         return null;
@@ -931,6 +1281,19 @@ class ApiService {
       final dynamic rawList = jsonData['data'];
 
       if (rawList is List) {
+        // 🔥 DEBUG: Check first few products for phone numbers
+        if (rawList.isNotEmpty) {
+          print(
+            '[ApiService] getAllProducts - Total products: ${rawList.length}',
+          );
+          for (int i = 0; i < (rawList.length > 3 ? 3 : rawList.length); i++) {
+            final item = rawList[i];
+            print(
+              '[ApiService] Product $i: title="${item['title']}", phone="${item['phone']}", phoneNumber="${item['phoneNumber']}", userPhone="${item['userPhone']}"',
+            );
+          }
+        }
+
         return rawList.map((item) => AllProductModel.fromJson(item)).toList();
       } else {
         throw Exception(
@@ -990,7 +1353,6 @@ class ApiService {
     required String userId, // 👈 Add this
     required String businessName,
     required String registrationNumber,
-    required String gstNumber,
     required String village,
     required String city,
     required String state,
@@ -1013,7 +1375,6 @@ class ApiService {
       request.fields['userId'] = userId; // ✅ Required
       request.fields['businessName'] = businessName;
       request.fields['registrationNumber'] = registrationNumber;
-      request.fields['gstNumber'] = gstNumber;
       request.fields['village'] = village;
       request.fields['city'] = city;
       request.fields['state'] = state;
@@ -1098,8 +1459,41 @@ class ApiService {
       return chatsData.map((e) {
         final chat = Chat.fromJson(e);
 
+        // Product image ko properly extract करते हैं अगर Chat.fromJson में नहीं मिला
+        String? finalProductImage = chat.productImage;
+
+        if ((finalProductImage == null || finalProductImage.isEmpty) &&
+            e['productId'] != null) {
+          // productId के through product image nikalne ki कोशिश करते हैं
+          final productData = e['productId'];
+          if (productData is Map) {
+            if (productData['mediaUrl'] is List &&
+                (productData['mediaUrl'] as List).isNotEmpty) {
+              finalProductImage = (productData['mediaUrl'] as List).first
+                  ?.toString();
+            } else if (productData['images'] is List &&
+                (productData['images'] as List).isNotEmpty) {
+              finalProductImage = (productData['images'] as List).first
+                  ?.toString();
+            } else if (productData['productImages'] is List &&
+                (productData['productImages'] as List).isNotEmpty) {
+              finalProductImage = (productData['productImages'] as List).first
+                  ?.toString();
+            }
+
+            // URL formatting
+            if (finalProductImage != null &&
+                finalProductImage.isNotEmpty &&
+                !finalProductImage.startsWith('http')) {
+              finalProductImage =
+                  'https://oldmarket.bhoomi.cloud/${finalProductImage.replaceAll('\\', '/')}';
+            }
+          }
+        }
+
         return chat.copyWith(
-          productImage: e['productImage'] ?? chat.productImage,
+          productImage:
+              finalProductImage ?? e['productImage'] ?? chat.productImage,
           profilePicture: e['profilePicture'] ?? chat.profilePicture,
         );
       }).toList();
@@ -1627,21 +2021,41 @@ class ApiService {
 
   static Future<Map<String, dynamic>?> getDealerStats(String dealerId) async {
     print("🔍 [API] getDealerStats called for dealerId: $dealerId");
-    final url =
-        "http://oldmarket.bhoomi.cloud/api/dealers/dealer/$dealerId/stats";
-    print("🌐 [API] URL: $url");
 
-    try {
-      final response = await http.get(Uri.parse(url));
-      print("📥 [API] Response Status: ${response.statusCode}");
-      print("📦 [API] Response Body: ${response.body}");
+    // Try multiple possible API endpoints for dealer stats
+    final urls = [
+      "http://oldmarket.bhoomi.cloud/api/dealers/dealer/$dealerId/stats",
+      "http://oldmarket.bhoomi.cloud/api/dealers/$dealerId/stats",
+      "http://oldmarket.bhoomi.cloud/api/dealers/stats/$dealerId",
+      "http://oldmarket.bhoomi.cloud/api/dealers/profile/$dealerId",
+    ];
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+    for (String url in urls) {
+      try {
+        print("🌐 [API] Trying URL: $url");
+        final response = await http.get(Uri.parse(url));
+        print("📥 [API] Response Status: ${response.statusCode} for $url");
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          print("📦 [API] Response Body: ${response.body}");
+
+          if (data != null &&
+              (data["status"] == true || data["data"] != null)) {
+            print("✅ [API] Found dealer data at: $url");
+            return data;
+          }
+        } else if (response.statusCode != 404) {
+          print(
+            "⚠️ [API] Non-404 error: ${response.statusCode} - ${response.body}",
+          );
+        }
+      } catch (e) {
+        print("❌ [API] Error with URL $url: $e");
       }
-    } catch (e) {
-      print("❌ [API] Error in getDealerStats: $e");
     }
+
+    print("❌ [API] All URLs failed for dealerId: $dealerId");
     return null;
   }
 
@@ -2022,20 +2436,33 @@ class ApiService {
 
   // -------------------- My Products (user-specific) --------------------
   static Future<List<AllProductModel>> getMyProducts() async {
-    final url = Uri.parse('$base/products/my');
     final tokenCtrl = Get.find<TokenController>();
     final headers = <String, String>{'Content-Type': 'application/json'};
     if (tokenCtrl.apiToken.value.isNotEmpty) {
       headers['Authorization'] = 'Bearer ${tokenCtrl.apiToken.value}';
     }
 
+    // First, get current logged-in user ID for proper filtering
+    final userId = await _getUserIdFromPrefsOrToken(tokenCtrl);
     print(
-      '[ApiService] getMyProducts called (token-based only). token present=${tokenCtrl.apiToken.value.isNotEmpty}',
+      '[ApiService] getMyProducts called. userId: $userId, token present=${tokenCtrl.apiToken.value.isNotEmpty}',
     );
+
+    if (userId.isEmpty) {
+      print(
+        '[ApiService] getMyProducts: no userId available - cannot filter user products',
+      );
+      apiLastError = 'User not logged in';
+      return <AllProductModel>[];
+    }
+
+    // Try primary authenticated endpoint first
+    final url = Uri.parse('$base/products/my');
     try {
       print('[ApiService] GET $url with headers: $headers');
       final response = await http.get(url, headers: headers);
       print('[ApiService] Response (${response.statusCode}): ${response.body}');
+
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
         final data = body['data'] as List<dynamic>? ?? [];
@@ -2043,53 +2470,77 @@ class ApiService {
           'ApiService',
           'getMyProducts: server returned ${data.length} items',
         );
-        final list = data
-            .map((e) => AllProductModel.fromJson(e as Map<String, dynamic>))
-            .toList();
-        if (list.isNotEmpty) return list;
+
+        if (data.isNotEmpty) {
+          final list = data
+              .map((e) => AllProductModel.fromJson(e as Map<String, dynamic>))
+              .toList();
+
+          // Double-check: Filter by userId to ensure we only get current user's products
+          final filteredList = list.where((product) {
+            return product.userId == userId ||
+                product.userId == userId.toString() ||
+                (product.userId.isNotEmpty && product.userId.contains(userId));
+          }).toList();
+
+          Logger.d(
+            'ApiService',
+            'getMyProducts filtered from ${list.length} to ${filteredList.length} items for userId=$userId',
+          );
+          return filteredList;
+        }
 
         Logger.d(
           'ApiService',
           'getMyProducts returned 0 items, attempting userid fallback',
         );
       }
+    } catch (e) {
+      print('[ApiService] getMyProducts primary endpoint error: $e');
+    }
 
-      final userId = await _getUserIdFromPrefsOrToken(tokenCtrl);
-      if (userId.isNotEmpty) {
-        final fbUrl = Uri.parse(
-          '$base/products?userid=$userId&page=1&limit=100',
-        );
-        try {
-          print('[ApiService] GET fallback $fbUrl with headers: $headers');
-          final fbRes = await http.get(fbUrl, headers: headers);
-          print(
-            '[ApiService] Fallback Response (${fbRes.statusCode}): ${fbRes.body}',
-          );
-          if (fbRes.statusCode == 200) {
-            final bodyFb = jsonDecode(fbRes.body);
-            final dataFb = bodyFb['data'] as List<dynamic>? ?? [];
-            final listFb = dataFb
-                .map((e) => AllProductModel.fromJson(e as Map<String, dynamic>))
-                .toList();
-            Logger.d(
-              'ApiService',
-              'getMyProducts fallback returned ${listFb.length} items for userid=$userId',
-            );
-            return listFb;
-          }
-        } catch (e) {
-          print('[ApiService] getMyProducts fallback error: $e');
+    // Fallback: Get all products and filter by userId
+    try {
+      print(
+        '[ApiService] Fallback: Getting all products and filtering by userId=$userId',
+      );
+      final allProducts = await getAllProducts();
+
+      final filteredProducts = allProducts.where((product) {
+        // Multiple checks to ensure proper filtering
+        bool isMyProduct = false;
+
+        // Check direct userId match
+        if (product.userId == userId || product.userId == userId.toString()) {
+          isMyProduct = true;
         }
-      } else {
-        print('[ApiService] getMyProducts: no userId available for fallback');
-      }
 
-      apiLastError = 'Failed to load my products';
-      return <AllProductModel>[];
-    } catch (e, st) {
-      print('[ApiService] getMyProducts error: $e');
-      print(st);
-      apiLastError = e.toString();
+        // Check if userId is contained in the product's userId field
+        if (!isMyProduct &&
+            product.userId.isNotEmpty &&
+            product.userId.contains(userId)) {
+          isMyProduct = true;
+        }
+
+        // Additional debugging
+        if (isMyProduct) {
+          print(
+            '[ApiService] Found my product: ${product.title} (userId: ${product.userId})',
+          );
+        }
+
+        return isMyProduct;
+      }).toList();
+
+      Logger.d(
+        'ApiService',
+        'getMyProducts fallback filtered ${filteredProducts.length} products from ${allProducts.length} total for userId=$userId',
+      );
+
+      return filteredProducts;
+    } catch (e) {
+      print('[ApiService] getMyProducts fallback error: $e');
+      apiLastError = 'Failed to load my products: $e';
       return <AllProductModel>[];
     }
   }
@@ -2544,11 +2995,12 @@ class ApiService {
   }
 
   static Future<http.Response> fetchRcRawResponse(String vehicleNo) async {
+    Logger.d('ApiService', 'fetchRcRawResponse called for vehicle: $vehicleNo');
     final uri = Uri.parse(
       "https://rto-vehicle-details-rc-puc-insurance-mparivahan.p.rapidapi.com/api/rc-vehicle/search-data?vehicle_no=$vehicleNo",
     );
 
-    print("🌐 [RC API] Request URI: $uri");
+    Logger.d('ApiService', 'RC API Request URI: $uri');
 
     final response = await http.get(
       uri,
@@ -2559,15 +3011,26 @@ class ApiService {
       },
     );
 
-    print("📥 [RC API] Response Status: ${response.statusCode}");
+    Logger.d('ApiService', 'RC API Response Status: ${response.statusCode}');
+    Logger.d(
+      'ApiService',
+      'RC API Response Body length: ${response.body.length}',
+    );
     return response;
   }
 
   static Map<String, dynamic> decodeJson(String body) {
+    Logger.d(
+      'ApiService',
+      'decodeJson called with body length: ${body.length}',
+    );
     try {
-      return json.decode(body);
+      final decoded = json.decode(body);
+      Logger.d('ApiService', 'JSON decode successful');
+      return decoded;
     } catch (e) {
-      print("❌ [RC API] JSON Decode Error: $e");
+      Logger.e('ApiService', 'JSON Decode Error: $e');
+      Logger.e('ApiService', 'Body content: $body');
       return {};
     }
   }

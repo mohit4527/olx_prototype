@@ -30,7 +30,6 @@ class DealerCarUploadController extends GetxController {
       return;
     }
 
-
     isUploading.value = true;
 
     try {
@@ -46,7 +45,38 @@ class DealerCarUploadController extends GetxController {
       );
 
       await ApiService.uploadDealerCar(dealerCarData, selectedImages);
+
+      // Clear form first
       clearForm();
+
+      // Show success message with enhanced styling
+      Get.snackbar(
+        "🎉 Dealer Success!",
+        "Dealer product has been uploaded successfully!\nRedirecting to home...",
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green.shade600,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+        icon: const Icon(Icons.check_circle, color: Colors.white, size: 28),
+        borderRadius: 12,
+        margin: const EdgeInsets.all(16),
+      );
+
+      // Navigate directly to home screen after a short delay
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      try {
+        // First try to navigate to home route
+        Get.offAllNamed("/home_screen");
+      } catch (e) {
+        try {
+          // Fallback: Pop all screens until we reach home
+          Get.until((route) => route.isFirst);
+        } catch (e2) {
+          // Final fallback: Simple back navigation
+          Get.back();
+        }
+      }
     } finally {
       isUploading.value = false;
     }

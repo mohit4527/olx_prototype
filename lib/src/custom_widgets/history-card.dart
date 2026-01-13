@@ -28,7 +28,7 @@ class HistoryCard extends StatelessWidget {
   String getFullImage(String path) {
     if (path.startsWith("http")) return path;
     if (path.isEmpty) return "assets/images/placeholder.jpg";
-    return "http://oldmarket.bhoomi.cloud/$path";
+    return "https://oldmarket.bhoomi.cloud/$path";
   }
 
   @override
@@ -47,12 +47,17 @@ class HistoryCard extends StatelessWidget {
               height: AppSizer().height14,
               child: displayImage.startsWith("http")
                   ? Image.network(
-                displayImage,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    Image.asset("assets/images/placeholder.jpg", fit: BoxFit.cover),
-              )
-                  : Image.asset("assets/images/placeholder.jpg", fit: BoxFit.cover),
+                      displayImage,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Image.asset(
+                        "assets/images/placeholder.jpg",
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Image.asset(
+                      "assets/images/placeholder.jpg",
+                      fit: BoxFit.cover,
+                    ),
             ),
           ),
           SizedBox(width: AppSizer().width3),
@@ -74,7 +79,11 @@ class HistoryCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.pin_drop, color: AppColors.appGrey.shade700, size: AppSizer().height2),
+                        Icon(
+                          Icons.pin_drop,
+                          color: AppColors.appGrey.shade700,
+                          size: AppSizer().height2,
+                        ),
                         SizedBox(width: AppSizer().width1),
                         Text(
                           location,

@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_sizer.dart';
 import '../../../controller/chat_details_controller.dart';
@@ -162,6 +163,28 @@ class ChatDetailsScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
             child: Row(
               children: [
+                // Attachment button (WhatsApp style)
+                Builder(
+                  builder: (ctx) => Container(
+                    decoration: BoxDecoration(
+                      color: ready
+                          ? const Color(0xff232e33)
+                          : Colors.grey.withOpacity(0.3),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.add,
+                        color: ready ? AppColors.appGreen : Colors.grey,
+                        size: 28,
+                      ),
+                      onPressed: ready
+                          ? () => _showAttachmentOptions(ctx, c)
+                          : null,
+                    ),
+                  ),
+                ),
+                SizedBox(width: AppSizer().width1),
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -189,23 +212,129 @@ class ChatDetailsScreen extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: AppSizer().width1),
-                Container(
-                  decoration: BoxDecoration(
-                    color: ready
-                        ? const Color(0xFF075E54)
-                        : Colors.grey.withOpacity(0.5),
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.send, color: AppColors.appWhite),
-                    onPressed: ready ? c.sendMessage : null,
-                  ),
-                ),
+                Obx(() {
+                  final isSending = c.isSendingMedia.value;
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: ready
+                          ? const Color(0xFF075E54)
+                          : Colors.grey.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: isSending
+                        ? const Padding(
+                            padding: EdgeInsets.all(12.0),
+                            child: CircularProgressIndicator(
+                              color: AppColors.appWhite,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : IconButton(
+                            icon: const Icon(
+                              Icons.send,
+                              color: AppColors.appWhite,
+                            ),
+                            onPressed: ready ? c.sendMessage : null,
+                          ),
+                  );
+                }),
               ],
             ),
           ),
         ),
       );
     });
+  }
+
+  // Show attachment options (WhatsApp style)
+  void _showAttachmentOptions(BuildContext context, ChatDetailsController c) {
+    print('📎 [ChatMedia] Showing attachment options');
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Choose Media',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.appGreen,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildAttachmentOption(
+                  icon: Icons.photo_library,
+                  label: 'Gallery',
+                  color: Colors.purple,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    c.pickAndSendImage(source: ImageSource.gallery);
+                  },
+                ),
+                _buildAttachmentOption(
+                  icon: Icons.camera_alt,
+                  label: 'Camera',
+                  color: Colors.pink,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    c.pickAndSendImage(source: ImageSource.camera);
+                  },
+                ),
+                _buildAttachmentOption(
+                  icon: Icons.videocam,
+                  label: 'Video',
+                  color: Colors.orange,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    c.pickAndSendVideo();
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+      isDismissible: true,
+      enableDrag: true,
+    );
+  }
+
+  Widget _buildAttachmentOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            child: Icon(icon, color: Colors.white, size: 30),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: Colors.black87),
+          ),
+        ],
+      ),
+    );
   }
 }

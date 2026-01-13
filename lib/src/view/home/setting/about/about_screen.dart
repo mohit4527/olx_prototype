@@ -240,10 +240,7 @@ class FeedbackDialog {
           },
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
+          TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);

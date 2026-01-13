@@ -67,10 +67,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     Color.fromARGB(255, 15, 15, 25),
                     Color.fromARGB(255, 25, 35, 65),
                   ]
-                : [
-                    Colors.white,
-                    Color.fromARGB(255, 245, 248, 255),
-                  ],
+                : [Colors.white, Color.fromARGB(255, 245, 248, 255)],
           ),
         ),
         child: SafeArea(
@@ -105,18 +102,22 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               // Main content
               SingleChildScrollView(
                 child: SizedBox(
-                  height: MediaQuery.of(context).size.height -
+                  height:
+                      MediaQuery.of(context).size.height -
                       MediaQuery.of(context).padding.top,
                   child: Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: AppSizer().width6),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppSizer().width6,
+                    ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         // Animated logo with shadow
                         AnimatedBuilder(
-                          animation: Listenable.merge(
-                              [_floatAnimation, _scaleAnimation]),
+                          animation: Listenable.merge([
+                            _floatAnimation,
+                            _scaleAnimation,
+                          ]),
                           builder: (context, child) {
                             return Transform.translate(
                               offset: Offset(0, _floatAnimation.value),
@@ -151,8 +152,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                     CustomPaint(
                                       painter: RotatingRingPainter(
                                         progress: _floatingController.value,
-                                        color: AppColors.appGreen
-                                            .withOpacity(0.3),
+                                        color: AppColors.appGreen.withOpacity(
+                                          0.3,
+                                        ),
                                       ),
                                       size: const Size(200, 200),
                                     ),
@@ -163,8 +165,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: AppColors.appGreen
-                                              .withOpacity(0.2),
+                                          color: AppColors.appGreen.withOpacity(
+                                            0.2,
+                                          ),
                                           width: 2,
                                         ),
                                       ),
@@ -188,10 +191,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         ShaderMask(
                           shaderCallback: (bounds) {
                             return LinearGradient(
-                              colors: [
-                                AppColors.appGreen,
-                                AppColors.appPurple,
-                              ],
+                              colors: [AppColors.appGreen, AppColors.appPurple],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ).createShader(bounds);
@@ -216,10 +216,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           height: 4,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [
-                                AppColors.appGreen,
-                                AppColors.appPurple,
-                              ],
+                              colors: [AppColors.appGreen, AppColors.appPurple],
                             ),
                             borderRadius: BorderRadius.circular(2),
                           ),
@@ -279,8 +276,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             child: ElevatedButton(
                               onPressed: () => Get.toNamed(AppRoutes.login),
                               style: ElevatedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
@@ -319,8 +317,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               onPressed: () =>
                                   Get.toNamed(AppRoutes.signup_screen),
                               style: OutlinedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
@@ -351,10 +350,83 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           'New here? Create an account to get started',
                           style: TextStyle(
                             fontSize: AppSizer().fontSize13,
-                            color: isDark
-                                ? Colors.white38
-                                : Colors.black38,
+                            color: isDark ? Colors.white38 : Colors.black38,
                             fontWeight: FontWeight.w500,
+                          ),
+                        ),
+
+                        SizedBox(height: AppSizer().height3),
+
+                        // Skip Button with theme styling
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.appPurple.withOpacity(0.15),
+                                blurRadius: 15,
+                                spreadRadius: 0,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                // Simply navigate to home without login
+                                Get.toNamed(AppRoutes.home);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                side: BorderSide(
+                                  color: AppColors.appPurple.withOpacity(0.4),
+                                  width: 1.5,
+                                ),
+                                backgroundColor: Colors.transparent,
+                                foregroundColor: AppColors.appPurple,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.remove_red_eye_outlined,
+                                    color: AppColors.appPurple,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Skip for now',
+                                    style: TextStyle(
+                                      fontSize: AppSizer().fontSize17,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.appPurple,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(height: AppSizer().height1),
+
+                        // Browse only info text
+                        Center(
+                          child: Text(
+                            'Browse only • Login required for actions',
+                            style: TextStyle(
+                              fontSize: AppSizer().fontSize12,
+                              color: isDark ? Colors.white30 : Colors.black26,
+                              fontWeight: FontWeight.w400,
+                              fontStyle: FontStyle.italic,
+                            ),
                           ),
                         ),
                       ],
@@ -408,10 +480,7 @@ class RotatingRingPainter extends CustomPainter {
   final double progress;
   final Color color;
 
-  RotatingRingPainter({
-    required this.progress,
-    required this.color,
-  });
+  RotatingRingPainter({required this.progress, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {

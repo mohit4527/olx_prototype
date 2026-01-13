@@ -52,13 +52,13 @@ class PhoneResolverService {
   static Future<String?> _tryDirectPhoneEndpoints(String userId) async {
     final endpoints = [
       'https://oldmarket.bhoomi.cloud/api/users/$userId/phone',
-      'http://oldmarket.bhoomi.cloud/api/users/$userId/phone',
+      'https://oldmarket.bhoomi.cloud/api/users/$userId/phone',
       'https://oldmarket.bhoomi.cloud/api/users/$userId/contact',
-      'http://oldmarket.bhoomi.cloud/api/users/$userId/contact',
+      'https://oldmarket.bhoomi.cloud/api/users/$userId/contact',
       'https://oldmarket.bhoomi.cloud/api/user/$userId/phone',
-      'http://oldmarket.bhoomi.cloud/api/user/$userId/phone',
+      'https://oldmarket.bhoomi.cloud/api/user/$userId/phone',
       'https://oldmarket.bhoomi.cloud/api/user/$userId/contact',
-      'http://oldmarket.bhoomi.cloud/api/user/$userId/contact',
+      'https://oldmarket.bhoomi.cloud/api/user/$userId/contact',
     ];
 
     for (final endpoint in endpoints) {
@@ -94,11 +94,11 @@ class PhoneResolverService {
   static Future<String?> _tryUserProfileEndpoints(String userId) async {
     final endpoints = [
       'https://oldmarket.bhoomi.cloud/api/users/$userId',
-      'http://oldmarket.bhoomi.cloud/api/users/$userId',
+      'https://oldmarket.bhoomi.cloud/api/users/$userId',
       'https://oldmarket.bhoomi.cloud/api/user/$userId',
-      'http://oldmarket.bhoomi.cloud/api/user/$userId',
+      'https://oldmarket.bhoomi.cloud/api/user/$userId',
       'https://oldmarket.bhoomi.cloud/api/auth/user/$userId',
-      'http://oldmarket.bhoomi.cloud/api/auth/user/$userId',
+      'https://oldmarket.bhoomi.cloud/api/auth/user/$userId',
     ];
 
     for (final endpoint in endpoints) {
@@ -146,9 +146,9 @@ class PhoneResolverService {
   static Future<String?> _tryUserProductsEndpoint(String userId) async {
     final endpoints = [
       'https://oldmarket.bhoomi.cloud/api/products?userId=$userId',
-      'http://oldmarket.bhoomi.cloud/api/products?userId=$userId',
+      'https://oldmarket.bhoomi.cloud/api/products?userId=$userId',
       'https://oldmarket.bhoomi.cloud/api/products/user/$userId',
-      'http://oldmarket.bhoomi.cloud/api/products/user/$userId',
+      'https://oldmarket.bhoomi.cloud/api/products/user/$userId',
     ];
 
     for (final endpoint in endpoints) {
@@ -199,9 +199,9 @@ class PhoneResolverService {
   static Future<String?> _trySearchUsersEndpoint(String userId) async {
     final endpoints = [
       'https://oldmarket.bhoomi.cloud/api/users',
-      'http://oldmarket.bhoomi.cloud/api/users',
+      'https://oldmarket.bhoomi.cloud/api/users',
       'https://oldmarket.bhoomi.cloud/api/auth/users',
-      'http://oldmarket.bhoomi.cloud/api/auth/users',
+      'https://oldmarket.bhoomi.cloud/api/auth/users',
     ];
 
     for (final endpoint in endpoints) {

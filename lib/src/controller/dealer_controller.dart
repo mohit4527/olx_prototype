@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 import 'package:olx_prototype/src/services/apiServices/apiServices.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service/auth_service.dart';
+import 'get_profile_controller.dart';
+import 'subscription_controller.dart';
 
 import '../utils/app_routes.dart';
 
@@ -254,6 +256,44 @@ class DealerProfileController extends GetxController {
 
         if (result["data"] != null && result["data"]["_id"] != null) {
           await saveDealerId(result["data"]["_id"]);
+        }
+
+        // 🔥 Update user role to Vendor and save business name
+        try {
+          if (Get.isRegistered<GetProfileController>()) {
+            final profileController = Get.find<GetProfileController>();
+            // Save business name to SharedPreferences
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(
+              'user_business_name',
+              businessNameController.text,
+            );
+            // Update profile data with business name
+            profileController.profileData['BusinessName'] =
+                businessNameController.text;
+            await profileController.updateRoleToDealer();
+            print(
+              '✅ [DealerController] Updated user role to Vendor and saved business name: ${businessNameController.text}',
+            );
+          }
+        } catch (e) {
+          print('⚠️ [DealerController] Could not update role: $e');
+        }
+
+        // 🚀 CREATE DEALER SUBSCRIPTION (1 month free)
+        try {
+          if (Get.isRegistered<SubscriptionController>()) {
+            final subscriptionController = Get.find<SubscriptionController>();
+            final userId = await AuthService.getLoggedInUserId();
+            await subscriptionController.createDealerSubscription(userId ?? '');
+            print(
+              '🎉 [DealerController] Dealer subscription created successfully!',
+            );
+          }
+        } catch (e) {
+          print(
+            '⚠️ [DealerController] Could not create dealer subscription: $e',
+          );
         }
 
         // 🔥 FIX: Use user-specific key for profile creation flag
@@ -643,6 +683,21 @@ class DealerProfileController extends GetxController {
       await prefs.setBool('isProfileCreated_$currentUserId', false);
     }
 
+    // 🔥 Update user role based on profile status
+    try {
+      if (Get.isRegistered<GetProfileController>()) {
+        final profileController = Get.find<GetProfileController>();
+        if (isProfileCreated.value) {
+          profileController.updateRoleToDealer();
+        } else {
+          profileController.updateRoleToUser();
+        }
+        print('✅ [DealerController] Updated user role based on profile status');
+      }
+    } catch (e) {
+      print('⚠️ [DealerController] Could not update role: $e');
+    }
+
     print(
       '🏁 [DealerController] checkIfProfileExists() completed - Final: ${isProfileCreated.value}',
     );
@@ -708,6 +763,17 @@ class DealerProfileController extends GetxController {
 
     // Also clear controller data
     _resetControllerData();
+
+    // 🔥 Update user role back to User when dealer profile is cleared
+    try {
+      if (Get.isRegistered<GetProfileController>()) {
+        final profileController = Get.find<GetProfileController>();
+        profileController.updateRoleToUser();
+        print('✅ [DealerController] Updated user role back to User');
+      }
+    } catch (e) {
+      print('⚠️ [DealerController] Could not update role to User: $e');
+    }
 
     print(
       '✅ [DealerController] Cleared all local dealer data from SharedPreferences',

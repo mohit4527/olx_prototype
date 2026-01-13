@@ -4,6 +4,8 @@ class DealerStats {
   final String? imageUrl;
   final String? businessLogo;
   final String? phone;
+  final String? city;
+  final String? dealerType;
   final int totalVehicles;
   final int totalSold;
   final int totalStock;
@@ -14,6 +16,8 @@ class DealerStats {
     this.imageUrl,
     this.businessLogo,
     this.phone,
+    this.city,
+    this.dealerType,
     required this.totalVehicles,
     required this.totalSold,
     required this.totalStock,
@@ -32,9 +36,26 @@ class DealerStats {
       imageUrl: imageUrl?.toString(),
       businessLogo: businessLogo?.toString(),
       phone: json['phone']?.toString() ?? json['contact']?.toString(),
-      totalVehicles: json['totalVehicles'] ?? 0,
-      totalSold: json['totalSold'] ?? 0,
-      totalStock: json['totalStock'] ?? 0,
+      city: json['city']?.toString(),
+      dealerType: json['dealerType']?.toString(),
+      totalVehicles:
+          json['totalVehicles'] ??
+          json['total_vehicles'] ??
+          json['vehicleCount'] ??
+          json['vehicles'] ??
+          0,
+      totalSold:
+          json['totalSold'] ??
+          json['total_sold'] ??
+          json['soldCount'] ??
+          json['sold'] ??
+          0,
+      totalStock:
+          json['totalStock'] ??
+          json['total_stock'] ??
+          json['stockCount'] ??
+          json['stock'] ??
+          0,
     );
   }
 }
@@ -47,6 +68,7 @@ class DealerProduct {
   final List images;
   final List<String>? tags; // Made nullable to avoid type errors
   final List<Offer> offers;
+  bool? status;
 
   DealerProduct({
     required this.id,
@@ -56,6 +78,7 @@ class DealerProduct {
     required this.images,
     this.tags, // Now optional
     required this.offers,
+    this.status,
   });
 
   factory DealerProduct.fromJson(Map<String, dynamic> json) {
@@ -86,6 +109,7 @@ class DealerProduct {
       offers: (json["offers"] ?? [])
           .map<Offer>((e) => Offer.fromJson(e))
           .toList(),
+      status: json['status'] as bool?,
     );
   }
 }

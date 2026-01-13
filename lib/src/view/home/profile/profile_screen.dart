@@ -4,12 +4,22 @@ import 'package:get/get.dart';
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_sizer.dart';
 import '../../../controller/get_profile_controller.dart';
+import '../../../controller/dealer_controller.dart';
 import '../../../custom_widgets/profile_page_helper.dart';
 
 class ProfilePage extends StatelessWidget {
   ProfilePage({super.key});
 
   final GetProfileController controller = Get.put(GetProfileController());
+
+  // 🔥 Get dealer controller to check profile status
+  DealerProfileController get dealerController {
+    if (Get.isRegistered<DealerProfileController>()) {
+      return Get.find<DealerProfileController>();
+    } else {
+      return Get.put(DealerProfileController());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,20 +108,38 @@ class ProfilePage extends StatelessWidget {
                   );
                 }),
                 SizedBox(height: AppSizer().height2),
-                Obx(
-                  () => Text(
-                    controller.profileData['Username'] ?? '',
+                Obx(() {
+                  // 🔥 Show business name if vendor, otherwise show username
+                  final isVendor = dealerController.isProfileCreated.value;
+                  final businessName =
+                      controller.profileData['BusinessName'] ?? '';
+                  final userName = controller.profileData['Username'] ?? '';
+
+                  final displayName = isVendor && businessName.isNotEmpty
+                      ? businessName
+                      : userName;
+
+                  return Text(
+                    displayName,
                     style: TextStyle(
                       fontSize: AppSizer().fontSize18,
                       fontWeight: FontWeight.bold,
                     ),
-                  ),
-                ),
+                  );
+                }),
                 Obx(() {
-                  final role = controller.profileData['Role'] ?? 'User';
+                  // 🔥 Dynamic role: show 'Vendor' for business accounts
+                  final role = dealerController.isProfileCreated.value
+                      ? 'Vendor'
+                      : (controller.profileData['Role'] ?? 'User');
                   return Text(
                     role,
-                    style: TextStyle(color: Colors.grey.shade700),
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontWeight: dealerController.isProfileCreated.value
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
                   );
                 }),
                 SizedBox(height: AppSizer().height3),
@@ -137,7 +165,17 @@ class ProfilePage extends StatelessWidget {
                   ];
                   return Column(
                     children: safeKeys.map((k) {
-                      final v = controller.profileData[k] ?? '';
+                      // 🔥 Dynamic value based on field type
+                      String v;
+                      if (k == 'Role') {
+                        // Dynamic role: show 'Vendor' for business accounts
+                        v = dealerController.isProfileCreated.value
+                            ? 'Vendor'
+                            : (controller.profileData[k] ?? 'User');
+                      } else {
+                        v = controller.profileData[k] ?? '';
+                      }
+
                       return Card(
                         elevation: 2,
                         margin: const EdgeInsets.symmetric(vertical: 8),
@@ -155,8 +193,19 @@ class ProfilePage extends StatelessWidget {
                           subtitle: Text(
                             v,
                             style: TextStyle(
-                              color: Colors.grey,
+                              color:
+                                  k == 'Role' &&
+                                      dealerController.isProfileCreated.value
+                                  ? AppColors
+                                        .appGreen // Highlight dealer role
+                                  : Colors.grey,
                               fontSize: AppSizer().fontSize15,
+                              fontWeight:
+                                  k == 'Role' &&
+                                      dealerController.isProfileCreated.value
+                                  ? FontWeight
+                                        .w600 // Bold for dealer role
+                                  : FontWeight.normal,
                             ),
                           ),
                           trailing: IconButton(

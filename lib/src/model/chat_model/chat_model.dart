@@ -139,6 +139,8 @@ class Message {
   final DateTime createdAt;
   MessageStatus status; // ✅ Tick status ke liye
   bool isEdited; // ✅ Edit track karne ke liye
+  final String? messageType; // 'text', 'image', 'video'
+  final String? mediaUrl; // URL for image/video
 
   Message({
     required this.id,
@@ -148,6 +150,8 @@ class Message {
     required this.createdAt,
     this.status = MessageStatus.sending,
     this.isEdited = false,
+    this.messageType,
+    this.mediaUrl,
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
@@ -159,6 +163,8 @@ class Message {
       createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
       status: _parseStatus(json['status']),
       isEdited: json['isEdited'] ?? false,
+      messageType: json['messageType']?.toString(),
+      mediaUrl: json['mediaUrl']?.toString(),
     );
   }
 
@@ -184,10 +190,18 @@ class Message {
       'createdAt': createdAt.toIso8601String(),
       'status': status.toString().split('.').last,
       'isEdited': isEdited,
+      'messageType': messageType,
+      'mediaUrl': mediaUrl,
     };
   }
 
-  Message copyWith({String? content, MessageStatus? status, bool? isEdited}) {
+  Message copyWith({
+    String? content,
+    MessageStatus? status,
+    bool? isEdited,
+    String? messageType,
+    String? mediaUrl,
+  }) {
     return Message(
       id: id,
       chatId: chatId,
@@ -196,6 +210,8 @@ class Message {
       createdAt: createdAt,
       status: status ?? this.status,
       isEdited: isEdited ?? this.isEdited,
+      messageType: messageType ?? this.messageType,
+      mediaUrl: mediaUrl ?? this.mediaUrl,
     );
   }
 }

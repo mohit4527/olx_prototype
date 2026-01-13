@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
 import '../../../constants/app_colors.dart';
 import '../../../controller/sell_user_car_controller.dart';
+import '../../../controller/all_products_controller.dart';
 
 class SellUserCarScreen extends StatelessWidget {
   SellUserCarScreen({super.key});
@@ -142,25 +143,84 @@ class SellUserCarScreen extends StatelessWidget {
                       },
                     ),
 
-                    // 🔥 Location field added
-                    SizedBox(height: AppSizer().height1),
-                    _buildLabel("Location *"),
-                    TextFormField(
-                      controller: controller.locationController,
-                      maxLines: 2,
-                      decoration: _inputDecoration(
-                        "Enter location (e.g., City, State, Country)",
+                    SizedBox(height: AppSizer().height2),
+
+                    /// 🔹 Location Section
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.blue.shade200),
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Location is required';
-                        }
-                        if (value.trim().length < 3) {
-                          return 'Please enter a valid location';
-                        }
-                        return null;
-                      },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "📍 Location",
+                            style: TextStyle(
+                              fontSize: AppSizer().fontSize16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 12),
+
+                          _buildLabel("Country *"),
+                          SizedBox(height: 4),
+                          TextFormField(
+                            controller: controller.countryController,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: _inputDecoration(
+                              "Enter country (e.g., India)",
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Country is required';
+                              }
+                              return null;
+                            },
+                          ),
+
+                          SizedBox(height: 8),
+
+                          _buildLabel("State *"),
+                          SizedBox(height: 4),
+                          TextFormField(
+                            controller: controller.stateController,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: _inputDecoration(
+                              "Enter state (e.g., Delhi)",
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'State is required';
+                              }
+                              return null;
+                            },
+                          ),
+
+                          SizedBox(height: 8),
+
+                          _buildLabel("City *"),
+                          SizedBox(height: 4),
+                          TextFormField(
+                            controller: controller.cityController,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: _inputDecoration(
+                              "Enter city (e.g., New Delhi)",
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'City is required';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
                     ),
+
+                    SizedBox(height: AppSizer().height2),
 
                     // 📞 Phone Number field added
                     SizedBox(height: AppSizer().height1),
@@ -276,12 +336,22 @@ class SellUserCarScreen extends StatelessWidget {
                     }),
 
                     SizedBox(height: AppSizer().height2),
+
                     Center(
                       child: Obx(
                         () => ElevatedButton(
                           onPressed: controller.isUploading.value
                               ? null
-                              : controller.uploadCarData,
+                              : () {
+                                  print('🔘 [UI] Upload button pressed!');
+                                  print(
+                                    '🔘 [UI] isUploading: ${controller.isUploading.value}',
+                                  );
+                                  print(
+                                    '🔘 [UI] selectedImages count: ${controller.selectedImages.length}',
+                                  );
+                                  controller.uploadCarData();
+                                },
                           style: ElevatedButton.styleFrom(
                             padding: EdgeInsets.symmetric(
                               horizontal: 40,

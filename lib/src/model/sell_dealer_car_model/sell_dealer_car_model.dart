@@ -7,6 +7,9 @@ class DealerCarModel {
   final String userId;
   final List<String> tags;
   final String category;
+  final String country;
+  final String state;
+  final String city;
 
   DealerCarModel({
     required this.title,
@@ -16,6 +19,9 @@ class DealerCarModel {
     required this.sellerType,
     required this.dealerId,
     required this.category,
+    required this.country,
+    required this.state,
+    required this.city,
     this.tags = const [],
   });
 }

@@ -4,8 +4,8 @@ import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
 import 'package:olx_prototype/src/controller/verify_otp_controller.dart';
 import 'package:olx_prototype/src/utils/app_routes.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'package:pin_code_fields/pin_code_fields.dart';
 
 class VerifyOtpScreen extends StatefulWidget {
   const VerifyOtpScreen({super.key});
@@ -17,6 +17,85 @@ class VerifyOtpScreen extends StatefulWidget {
 class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
   final _formKey = GlobalKey<FormState>();
   final VerifyOtpController controller = Get.put(VerifyOtpController());
+
+  // SMS Autofill
+  static const platform = MethodChannel('sms_autofill');
+
+  // Flag to prevent double submission
+  bool _isVerifying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    print('🔥🔥🔥 [OTP Screen] InitState called - Starting SMS listener setup');
+    _listenForSms();
+  }
+
+  Future<void> _listenForSms() async {
+    print('🔥 [SMS Listener] Starting SMS autofill setup...');
+    try {
+      // Request SMS permission and start listening
+      print(
+        '🔥 [SMS Listener] Calling platform.invokeMethod(startListening)...',
+      );
+      final result = await platform.invokeMethod('startListening');
+      print('🔥 [SMS Listener] ✅ startListening result: $result');
+
+      // Listen for SMS code
+      print('🔥 [SMS Listener] Setting up method call handler...');
+      platform.setMethodCallHandler((call) async {
+        print('🔥🔥🔥 [SMS Listener] Method call received: ${call.method}');
+        print('🔥 [SMS Listener] Arguments: ${call.arguments}');
+
+        if (call.method == 'onSmsReceived') {
+          final String? code = call.arguments as String?;
+          print('🔥🔥🔥 [SMS Listener] OTP RECEIVED: $code');
+
+          if (code != null && code.isNotEmpty) {
+            print('🔥 [SMS Listener] Setting OTP in controller: $code');
+
+            // Set flag to prevent onCompleted from also verifying
+            _isVerifying = true;
+
+            setState(() {
+              controller.otpController.text = code;
+            });
+            print('🔥 [SMS Listener] OTP set successfully, UI updated');
+
+            // Auto verify after receiving OTP
+            await Future.delayed(const Duration(milliseconds: 800));
+            if (mounted && code.length >= 4) {
+              print('🔥 [SMS Listener] Auto-verifying OTP...');
+              controller.verifyOtp();
+            } else {
+              print(
+                '🔥 [SMS Listener] ❌ Cannot auto-verify: mounted=$mounted, code.length=${code.length}',
+              );
+            }
+          } else {
+            print('🔥 [SMS Listener] ❌ Code is null or empty');
+          }
+        } else {
+          print('🔥 [SMS Listener] ⚠️ Unknown method: ${call.method}');
+        }
+        return null;
+      });
+      print('🔥 [SMS Listener] ✅ Method call handler set successfully');
+    } catch (e) {
+      print('🔥🔥🔥 [SMS Listener] ❌ ERROR setting up SMS autofill: $e');
+      print('🔥 [SMS Listener] Error stack trace: ${StackTrace.current}');
+    }
+  }
+
+  @override
+  void dispose() {
+    try {
+      platform.invokeMethod('stopListening');
+    } catch (e) {
+      print('Error stopping SMS listener: $e');
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,31 +181,61 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                           }),
                           SizedBox(height: AppSizer().height4),
 
-                          TextFormField(
+                          // PinCodeFields for better OTP input with autofill support
+                          PinCodeTextField(
+                            appContext: context,
+                            length: 4,
                             controller: controller.otpController,
                             keyboardType: TextInputType.number,
-                            maxLength: 6,
-                            validator: (value) {
-                              if (value == null ||
-                                  (value.length != 4 && value.length != 6)) {
-                                return "Enter 4 or 6-digit OTP";
-                              }
-                              return null;
-                            },
-                            decoration: InputDecoration(
-                              hintText: "Enter OTP",
-                              prefixIcon: const Icon(Icons.lock),
-                              counterText: "",
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
+                            animationType: AnimationType.fade,
+                            pinTheme: PinTheme(
+                              shape: PinCodeFieldShape.box,
+                              borderRadius: BorderRadius.circular(10),
+                              fieldHeight: 50,
+                              fieldWidth: 40,
+                              activeFillColor: Colors.white,
+                              inactiveFillColor: Colors.white,
+                              selectedFillColor: Colors.white,
+                              activeColor: AppColors.appGreen,
+                              inactiveColor: Colors.grey,
+                              selectedColor: AppColors.appPurple,
                             ),
+                            animationDuration: const Duration(
+                              milliseconds: 300,
+                            ),
+                            backgroundColor: Colors.transparent,
+                            enableActiveFill: true,
+                            cursorColor: AppColors.appGreen,
+                            onCompleted: (code) {
+                              print('[OTP] Code entered: $code');
+                              // Only verify if not already verifying from SMS auto-fill
+                              if (!_isVerifying) {
+                                print('[OTP] Manual entry - Auto verifying...');
+                                Future.delayed(
+                                  const Duration(milliseconds: 300),
+                                  () {
+                                    controller.verifyOtp();
+                                  },
+                                );
+                              } else {
+                                print(
+                                  '[OTP] Skipping verification - already handled by SMS listener',
+                                );
+                              }
+                            },
+                            onChanged: (value) {
+                              print('[OTP] Current value: $value');
+                              // Reset flag if user starts typing manually
+                              if (_isVerifying && value.length < 4) {
+                                setState(() {
+                                  _isVerifying = false;
+                                });
+                              }
+                            },
+                            beforeTextPaste: (text) {
+                              print('[OTP] Pasting text: $text');
+                              return true; // Allow paste
+                            },
                           ),
                           SizedBox(height: AppSizer().height4),
                           Obx(
@@ -134,8 +243,17 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                               onTap: controller.isLoading.value
                                   ? null
                                   : () {
-                                      if (_formKey.currentState!.validate()) {
+                                      final otp = controller.otpController.text
+                                          .trim();
+                                      if (otp.length >= 4) {
                                         controller.verifyOtp();
+                                      } else {
+                                        Get.snackbar(
+                                          "Error",
+                                          "Please enter valid OTP",
+                                          backgroundColor: AppColors.appRed,
+                                          colorText: Colors.white,
+                                        );
                                       }
                                     },
                               child: Container(
@@ -167,71 +285,6 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                             ),
                           ),
                           SizedBox(height: AppSizer().height2),
-                          // Debug: show last request/response saved (dev only)
-                          TextButton(
-                            onPressed: () async {
-                              final prefs =
-                                  await SharedPreferences.getInstance();
-                              final req =
-                                  prefs.getString('last_verify_request') ??
-                                  'No request saved';
-                              final res =
-                                  prefs.getString('last_verify_response') ??
-                                  'No response saved';
-                              showDialog(
-                                context: context,
-                                builder: (_) => AlertDialog(
-                                  title: const Text(
-                                    'Last verify request/response',
-                                  ),
-                                  content: SingleChildScrollView(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Text('Request:'),
-                                        SelectableText(req),
-                                        const SizedBox(height: 12),
-                                        const Text('Response:'),
-                                        SelectableText(res),
-                                      ],
-                                    ),
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () async {
-                                        final combined =
-                                            'Request:\n' +
-                                            req +
-                                            '\n\nResponse:\n' +
-                                            res;
-                                        await Clipboard.setData(
-                                          ClipboardData(text: combined),
-                                        );
-                                        Get.back();
-                                        Get.snackbar(
-                                          'Copied',
-                                          'Request and response copied to clipboard',
-                                        );
-                                      },
-                                      child: const Text('Copy'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () => Get.back(),
-                                      child: const Text('Close'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                            child: Text(
-                              "Show last API exchange (debug)",
-                              style: TextStyle(
-                                color: AppColors.appPurple,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
                           TextButton(
                             onPressed: () {
                               // Navigate to login so user can change phone number

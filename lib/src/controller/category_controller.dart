@@ -93,7 +93,7 @@ class CategoryController extends GetxController {
     // Reduced limit for faster response
     final apiUrl = tab == 'user'
         ? 'https://oldmarket.bhoomi.cloud/api/products?page=1&limit=50'
-        : 'http://oldmarket.bhoomi.cloud/api/dealers/dealer/cars';
+        : 'https://oldmarket.bhoomi.cloud/api/dealers/dealer/cars';
 
     try {
       print('[CategoryController] Fetching fresh data for $tab');

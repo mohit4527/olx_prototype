@@ -75,7 +75,7 @@ class DescriptionController extends GetxController {
 
       // Simple approach: Get all products and find user's products
       final response = await http.get(
-        Uri.parse('http://oldmarket.bhoomi.cloud/api/products'),
+        Uri.parse('https://oldmarket.bhoomi.cloud/api/products'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -122,7 +122,7 @@ class DescriptionController extends GetxController {
               if (profileImg.isNotEmpty) {
                 profileImg = profileImg.replaceAll('\\', '/');
                 if (!profileImg.startsWith('http')) {
-                  profileImg = 'http://oldmarket.bhoomi.cloud$profileImg';
+                  profileImg = 'https://oldmarket.bhoomi.cloud$profileImg';
                 }
               }
               uploaderImage.value = profileImg;

@@ -62,7 +62,7 @@ class _DealerDetailScreenState extends State<DealerDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const baseUrl = "http://oldmarket.bhoomi.cloud/";
+    const baseUrl = "https://oldmarket.bhoomi.cloud/";
 
     return Scaffold(
       backgroundColor: Colors.white,

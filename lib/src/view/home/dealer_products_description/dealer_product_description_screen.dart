@@ -14,9 +14,59 @@ import '../../../controller/dealer_product_description_controller.dart';
 import '../../../controller/dealer_wishlist_controller.dart';
 import '../../../controller/recently_viewed_controller.dart';
 import '../../../controller/chat_controller.dart';
+import '../../../controller/comment_controller.dart';
 import '../../../model/recently_product_model/recently_product_model.dart';
 import '../../../services/auth_service/auth_service.dart';
+import '../../../custom_widgets/comment_section_widget.dart';
 import '../dealer_detail/dealer_detail_screen.dart';
+
+// 📸 Full Screen Image Gallery Function
+void _showFullScreenDealerImages(List<String> imageUrls, int initialIndex) {
+  Get.to(
+    () => Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: Icon(Icons.close, color: Colors.white, size: 30),
+          onPressed: () => Get.back(),
+        ),
+      ),
+      body: PageView.builder(
+        controller: PageController(initialPage: initialIndex),
+        itemCount: imageUrls.length,
+        itemBuilder: (context, index) {
+          final raw = imageUrls[index];
+          final imagePath = raw.replaceAll('\\', '/');
+          final url = 'https://oldmarket.bhoomi.cloud/$imagePath';
+
+          return Container(
+            child: InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Center(
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Image.asset(
+                      'assets/images/placeholder.jpg',
+                      fit: BoxFit.contain,
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    ),
+    fullscreenDialog: true,
+  );
+}
 
 class DealerDescriptionScreen extends StatelessWidget {
   final String productId;
@@ -73,6 +123,10 @@ class DealerDescriptionScreen extends StatelessWidget {
         passedSellerType: sellerType,
       ),
     );
+
+    // Comment Controller
+    final commentController = Get.put(CommentController());
+
     // Use Get.find if already exists, otherwise create new
     ChatController chatController;
     try {
@@ -148,44 +202,55 @@ class DealerDescriptionScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (product.images != null && product.images!.isNotEmpty) ...[
-                    CarouselSlider(
-                      options: CarouselOptions(
-                        height: AppSizer().height30,
-                        autoPlay: true,
-                        enlargeCenterPage: true,
-                        viewportFraction: 1.0,
-                        onPageChanged: (index, reason) {
-                          controller.updateImageIndex(index);
-                        },
-                      ),
-                      items: product.images!.map((imagePath) {
-                        final image = imagePath.replaceAll('\\', '/');
-                        return Container(
-                          width: MediaQuery.of(context).size.width,
-                          margin: EdgeInsets.symmetric(
-                            horizontal: AppSizer().width1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.appGrey.shade200,
-                            borderRadius: BorderRadius.circular(
-                              AppSizer().height1,
+                    GestureDetector(
+                      onTap: () =>
+                          _showFullScreenDealerImages(product.images!, 0),
+                      child: CarouselSlider(
+                        options: CarouselOptions(
+                          height: AppSizer().height30,
+                          autoPlay: true,
+                          enlargeCenterPage: true,
+                          viewportFraction: 1.0,
+                          onPageChanged: (index, reason) {
+                            controller.updateImageIndex(index);
+                          },
+                        ),
+                        items: product.images!.map((imagePath) {
+                          final imageIndex = product.images!.indexOf(imagePath);
+                          final image = imagePath.replaceAll('\\', '/');
+                          return GestureDetector(
+                            onTap: () => _showFullScreenDealerImages(
+                              product.images!,
+                              imageIndex,
                             ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(
-                              AppSizer().height1,
-                            ),
-                            child: Image.network(
-                              "https://oldmarket.bhoomi.cloud/$image",
-                              fit: BoxFit.cover,
-                              errorBuilder: (c, e, st) => Image.asset(
-                                'assets/images/placeholder.jpg',
-                                fit: BoxFit.cover,
+                            child: Container(
+                              width: MediaQuery.of(context).size.width,
+                              margin: EdgeInsets.symmetric(
+                                horizontal: AppSizer().width1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.appGrey.shade200,
+                                borderRadius: BorderRadius.circular(
+                                  AppSizer().height1,
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  AppSizer().height1,
+                                ),
+                                child: Image.network(
+                                  "https://oldmarket.bhoomi.cloud/$image",
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (c, e, st) => Image.asset(
+                                    'assets/images/placeholder.jpg',
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }).toList(),
+                      ),
                     ),
                     SizedBox(height: AppSizer().height2),
                     Obx(
@@ -461,6 +526,21 @@ class DealerDescriptionScreen extends StatelessWidget {
                                   _shareDealerProductDirectly(product),
                               icon: const Icon(Icons.share),
                             ),
+
+                            // Comment Icon Button
+                            IconButton(
+                              onPressed: () {
+                                _showCommentsBottomSheet(
+                                  context,
+                                  product.id!,
+                                  commentController,
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.comment_outlined,
+                                color: Colors.black,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -507,12 +587,64 @@ class DealerDescriptionScreen extends StatelessWidget {
                     padding: EdgeInsets.symmetric(
                       horizontal: AppSizer().width1,
                     ),
-                    child: Text(
-                      product.title!,
-                      style: TextStyle(
-                        fontSize: AppSizer().fontSize18,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.title!,
+                          style: TextStyle(
+                            fontSize: AppSizer().fontSize18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (product.isBoosted) ...[
+                          SizedBox(height: AppSizer().height1),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.orange.shade600,
+                                  Colors.deepOrange,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.orange.withOpacity(0.4),
+                                  blurRadius: 8,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.rocket_launch,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'BOOSTED',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   Row(
@@ -1076,4 +1208,91 @@ class DealerDescriptionScreen extends StatelessWidget {
       return false;
     }
   }
+}
+
+// Show Comments Bottom Sheet
+void _showCommentsBottomSheet(
+  BuildContext context,
+  String carId,
+  CommentController commentController,
+) {
+  Get.bottomSheet(
+    DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.3,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 10,
+                offset: Offset(0, -2),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Title
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppSizer().height2,
+                  vertical: AppSizer().height1,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.comment, color: AppColors.appGreen),
+                    SizedBox(width: 8),
+                    Text(
+                      'Comments',
+                      style: TextStyle(
+                        fontSize: AppSizer().fontSize18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Spacer(),
+                    IconButton(
+                      icon: Icon(Icons.close),
+                      onPressed: () => Get.back(),
+                    ),
+                  ],
+                ),
+              ),
+
+              Divider(height: 1),
+
+              // Comment Section
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  child: CommentSection(
+                    targetId: carId,
+                    isProduct: false,
+                    commentController: commentController,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+    isDismissible: true,
+    enableDrag: true,
+    isScrollControlled: true,
+  );
 }

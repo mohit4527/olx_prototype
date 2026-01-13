@@ -36,6 +36,17 @@ class DescriptionController extends GetxController {
     try {
       print('[DescriptionController] fetchProductById start -> $productId');
       isLoading(true);
+
+      // Check if we have productData in Get.arguments
+      final args = Get.arguments;
+      if (args is Map && args['productData'] != null) {
+        print(
+          '[DescriptionController] 🎯 Found productData in arguments, using direct data',
+        );
+        await _loadProductFromData(args['productData']);
+        return;
+      }
+
       final data = await ApiService.fetchProductById(productId);
       product.value = data;
 
@@ -63,6 +74,63 @@ class DescriptionController extends GetxController {
       Get.snackbar("Error", e.toString());
     } finally {
       isLoading(false);
+    }
+  }
+
+  /// Load product from direct data (from city_products_screen)
+  Future<void> _loadProductFromData(Map<String, dynamic> productData) async {
+    try {
+      print(
+        '[DescriptionController] 🎯 Loading product from direct data: ${productData['title']}',
+      );
+
+      // Create ProductModel from the data
+      final productModel = ProductModel(
+        id: productData['id']?.toString() ?? '',
+        title: productData['title']?.toString() ?? '',
+        description: productData['description']?.toString() ?? '',
+        price: productData['price'] is String
+            ? int.tryParse(productData['price']) ?? 0
+            : productData['price'] ?? 0,
+        mediaUrl:
+            (productData['images'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            [],
+        type: productData['category']?.toString() ?? 'general',
+        city: productData['location']?.toString() ?? '',
+        state: '', // Not available in productData
+        country: 'India', // Default
+        createdAt: DateTime.now().toIso8601String(),
+        imageUrl: (productData['images'] as List?)?.isNotEmpty == true
+            ? (productData['images'] as List).first.toString()
+            : '',
+        userId: productData['userId']?.toString(),
+        whatsapp: productData['phone']?.toString(),
+        phoneNumber: productData['phone']?.toString(),
+      );
+
+      product.value = productModel;
+
+      // Fetch uploader profile if userId available
+      if (productModel.userId != null && productModel.userId!.isNotEmpty) {
+        print(
+          '[DescriptionController] 🔥 Starting profile fetch for userId: ${productModel.userId}',
+        );
+        await fetchUploaderProfile(productModel.userId!);
+      } else {
+        print('[DescriptionController] 🤷 No userId in direct product data');
+      }
+
+      // Set contact info
+      uploaderPhone.value = productData['phone']?.toString() ?? '';
+      uploaderWhatsApp.value = productData['phone']?.toString() ?? '';
+
+      print(
+        '[DescriptionController] ✅ Product loaded from direct data successfully',
+      );
+    } catch (e) {
+      print('[DescriptionController] ❌ Error loading from direct data: $e');
     }
   }
 
@@ -126,7 +194,9 @@ class DescriptionController extends GetxController {
     try {
       // Try with populate parameter
       var response = await http.get(
-        Uri.parse('http://oldmarket.bhoomi.cloud/api/products?populate=userId'),
+        Uri.parse(
+          'https://oldmarket.bhoomi.cloud/api/products?populate=userId',
+        ),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -140,7 +210,7 @@ class DescriptionController extends GetxController {
       // If populate doesn't work, try regular products API
       if (response.statusCode != 200) {
         response = await http.get(
-          Uri.parse('http://oldmarket.bhoomi.cloud/api/products'),
+          Uri.parse('https://oldmarket.bhoomi.cloud/api/products'),
           headers: {'Content-Type': 'application/json'},
         );
         print(
@@ -198,7 +268,7 @@ class DescriptionController extends GetxController {
               if (profileImg.isNotEmpty) {
                 profileImg = profileImg.replaceAll('\\', '/');
                 if (!profileImg.startsWith('http')) {
-                  profileImg = 'http://oldmarket.bhoomi.cloud$profileImg';
+                  profileImg = 'https://oldmarket.bhoomi.cloud$profileImg';
                 }
               }
               uploaderImage.value = profileImg;
@@ -258,11 +328,11 @@ class DescriptionController extends GetxController {
       print('[DescriptionController] 🔥 Trying direct user API for: $userId');
 
       final endpoints = [
-        'http://oldmarket.bhoomi.cloud/api/users/$userId/profile',
-        'http://oldmarket.bhoomi.cloud/api/users/$userId',
-        'http://oldmarket.bhoomi.cloud/api/user/$userId/profile',
-        'http://oldmarket.bhoomi.cloud/api/user/$userId',
-        'http://oldmarket.bhoomi.cloud/api/profile/$userId',
+        'https://oldmarket.bhoomi.cloud/api/users/$userId/profile',
+        'https://oldmarket.bhoomi.cloud/api/users/$userId',
+        'https://oldmarket.bhoomi.cloud/api/user/$userId/profile',
+        'https://oldmarket.bhoomi.cloud/api/user/$userId',
+        'https://oldmarket.bhoomi.cloud/api/profile/$userId',
       ];
 
       for (final endpoint in endpoints) {
@@ -299,7 +369,7 @@ class DescriptionController extends GetxController {
               if (profileImg.isNotEmpty) {
                 profileImg = profileImg.replaceAll('\\', '/');
                 if (!profileImg.startsWith('http')) {
-                  profileImg = 'http://oldmarket.bhoomi.cloud$profileImg';
+                  profileImg = 'https://oldmarket.bhoomi.cloud$profileImg';
                 }
               }
               uploaderImage.value = profileImg;
@@ -324,9 +394,9 @@ class DescriptionController extends GetxController {
       print('[DescriptionController] 🔥 Trying users listing API for: $userId');
 
       final endpoints = [
-        'http://oldmarket.bhoomi.cloud/api/users',
-        'http://oldmarket.bhoomi.cloud/api/users/all',
-        'http://oldmarket.bhoomi.cloud/api/auth/users',
+        'https://oldmarket.bhoomi.cloud/api/users',
+        'https://oldmarket.bhoomi.cloud/api/users/all',
+        'https://oldmarket.bhoomi.cloud/api/auth/users',
       ];
 
       for (final endpoint in endpoints) {
@@ -378,7 +448,7 @@ class DescriptionController extends GetxController {
                 if (profileImg.isNotEmpty) {
                   profileImg = profileImg.replaceAll('\\', '/');
                   if (!profileImg.startsWith('http')) {
-                    profileImg = 'http://oldmarket.bhoomi.cloud$profileImg';
+                    profileImg = 'https://oldmarket.bhoomi.cloud$profileImg';
                   }
                 }
                 uploaderImage.value = profileImg;
@@ -408,10 +478,10 @@ class DescriptionController extends GetxController {
       );
 
       final endpoints = [
-        'http://oldmarket.bhoomi.cloud/api/products/user/$userId',
-        'http://oldmarket.bhoomi.cloud/api/products/by-user/$userId',
-        'http://oldmarket.bhoomi.cloud/api/user/$userId/products',
-        'http://oldmarket.bhoomi.cloud/api/users/$userId/products',
+        'https://oldmarket.bhoomi.cloud/api/products/user/$userId',
+        'https://oldmarket.bhoomi.cloud/api/products/by-user/$userId',
+        'https://oldmarket.bhoomi.cloud/api/user/$userId/products',
+        'https://oldmarket.bhoomi.cloud/api/users/$userId/products',
       ];
 
       for (final endpoint in endpoints) {
@@ -444,7 +514,7 @@ class DescriptionController extends GetxController {
                 if (profileImg.isNotEmpty) {
                   profileImg = profileImg.replaceAll('\\', '/');
                   if (!profileImg.startsWith('http')) {
-                    profileImg = 'http://oldmarket.bhoomi.cloud$profileImg';
+                    profileImg = 'https://oldmarket.bhoomi.cloud$profileImg';
                   }
                 }
                 uploaderImage.value = profileImg;
@@ -499,7 +569,7 @@ class DescriptionController extends GetxController {
       );
 
       final response = await http.get(
-        Uri.parse('http://oldmarket.bhoomi.cloud/api/products'),
+        Uri.parse('https://oldmarket.bhoomi.cloud/api/products'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -555,10 +625,10 @@ class DescriptionController extends GetxController {
 
       // Try video-specific endpoints
       final videoEndpoints = [
-        'http://oldmarket.bhoomi.cloud/api/videos/user/$userId',
-        'http://oldmarket.bhoomi.cloud/api/user/$userId/videos',
-        'http://oldmarket.bhoomi.cloud/api/products?type=video&userId=$userId',
-        'http://oldmarket.bhoomi.cloud/api/videos?userId=$userId',
+        'https://oldmarket.bhoomi.cloud/api/videos/user/$userId',
+        'https://oldmarket.bhoomi.cloud/api/user/$userId/videos',
+        'https://oldmarket.bhoomi.cloud/api/products?type=video&userId=$userId',
+        'https://oldmarket.bhoomi.cloud/api/videos?userId=$userId',
       ];
 
       for (final endpoint in videoEndpoints) {
@@ -706,12 +776,12 @@ class DescriptionController extends GetxController {
 
       // Try authentication/profile endpoints
       final altEndpoints = [
-        'http://oldmarket.bhoomi.cloud/api/auth/profile/$userId',
-        'http://oldmarket.bhoomi.cloud/api/profile/user/$userId',
-        'http://oldmarket.bhoomi.cloud/api/accounts/$userId',
-        'http://oldmarket.bhoomi.cloud/api/members/$userId',
-        'http://oldmarket.bhoomi.cloud/api/users/$userId/info',
-        'http://oldmarket.bhoomi.cloud/api/user-info/$userId',
+        'https://oldmarket.bhoomi.cloud/api/auth/profile/$userId',
+        'https://oldmarket.bhoomi.cloud/api/profile/user/$userId',
+        'https://oldmarket.bhoomi.cloud/api/accounts/$userId',
+        'https://oldmarket.bhoomi.cloud/api/members/$userId',
+        'https://oldmarket.bhoomi.cloud/api/users/$userId/info',
+        'https://oldmarket.bhoomi.cloud/api/user-info/$userId',
       ];
 
       for (final endpoint in altEndpoints) {
@@ -782,7 +852,7 @@ class DescriptionController extends GetxController {
               if (profileImg.isNotEmpty) {
                 profileImg = profileImg.replaceAll('\\', '/');
                 if (!profileImg.startsWith('http')) {
-                  profileImg = 'http://oldmarket.bhoomi.cloud$profileImg';
+                  profileImg = 'https://oldmarket.bhoomi.cloud$profileImg';
                 }
               }
               uploaderImage.value = profileImg;
@@ -817,10 +887,10 @@ class DescriptionController extends GetxController {
 
       // Try dealer products endpoints
       final dealerProductEndpoints = [
-        'http://oldmarket.bhoomi.cloud/api/dealer-products?dealerId=$userId',
-        'http://oldmarket.bhoomi.cloud/api/dealer-products?userId=$userId',
-        'http://oldmarket.bhoomi.cloud/api/products?sellerType=dealer&userId=$userId',
-        'http://oldmarket.bhoomi.cloud/api/products?dealerId=$userId',
+        'https://oldmarket.bhoomi.cloud/api/dealer-products?dealerId=$userId',
+        'https://oldmarket.bhoomi.cloud/api/dealer-products?userId=$userId',
+        'https://oldmarket.bhoomi.cloud/api/products?sellerType=dealer&userId=$userId',
+        'https://oldmarket.bhoomi.cloud/api/products?dealerId=$userId',
       ];
 
       for (final endpoint in dealerProductEndpoints) {
@@ -877,10 +947,10 @@ class DescriptionController extends GetxController {
 
       // Try multiple dealer profile endpoints
       final dealerEndpoints = [
-        'http://oldmarket.bhoomi.cloud/api/dealer-profiles',
-        'http://oldmarket.bhoomi.cloud/api/dealers/profiles',
-        'http://oldmarket.bhoomi.cloud/api/auth/dealer-profiles',
-        'http://oldmarket.bhoomi.cloud/api/dealers',
+        'https://oldmarket.bhoomi.cloud/api/dealer-profiles',
+        'https://oldmarket.bhoomi.cloud/api/dealers/profiles',
+        'https://oldmarket.bhoomi.cloud/api/auth/dealer-profiles',
+        'https://oldmarket.bhoomi.cloud/api/dealers',
       ];
 
       for (final endpoint in dealerEndpoints) {
@@ -936,7 +1006,7 @@ class DescriptionController extends GetxController {
                 if (dealerLogo.isNotEmpty) {
                   dealerLogo = dealerLogo.replaceAll('\\', '/');
                   if (!dealerLogo.startsWith('http')) {
-                    dealerLogo = 'http://oldmarket.bhoomi.cloud$dealerLogo';
+                    dealerLogo = 'https://oldmarket.bhoomi.cloud$dealerLogo';
                   }
                   uploaderImage.value = dealerLogo;
                 }

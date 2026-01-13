@@ -24,15 +24,15 @@ class LogInScreen extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: isDark
                   ? LinearGradient(
-                colors: [Colors.black, Colors.grey.shade900],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
+                      colors: [Colors.black, Colors.grey.shade900],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
                   : LinearGradient(
-                colors: [AppColors.appGreen, Colors.white],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+                      colors: [AppColors.appGreen, Colors.white],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
             ),
           ),
 
@@ -63,7 +63,7 @@ class LogInScreen extends StatelessWidget {
                             color: Colors.black26,
                             blurRadius: 10,
                             offset: const Offset(0, 4),
-                          )
+                          ),
                         ],
                       ),
                       child: Form(
@@ -163,7 +163,7 @@ class LogInScreen extends StatelessWidget {
 
                             /// Send OTP Button
                             Obx(
-                                  () => InkWell(
+                              () => InkWell(
                                 onTap: () {
                                   if (_formKey.currentState!.validate()) {
                                     loginController.loginWithPhone();
@@ -175,7 +175,7 @@ class LogInScreen extends StatelessWidget {
                                     gradient: LinearGradient(
                                       colors: [
                                         AppColors.appPurple,
-                                        AppColors.appGreen
+                                        AppColors.appGreen,
                                       ],
                                     ),
                                     borderRadius: BorderRadius.circular(20),
@@ -183,36 +183,16 @@ class LogInScreen extends StatelessWidget {
                                   child: Center(
                                     child: loginController.isLoading.value
                                         ? const CircularProgressIndicator(
-                                      color: Colors.white,
-                                    )
+                                            color: Colors.white,
+                                          )
                                         : Text(
-                                      "Send OTP",
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: AppSizer().fontSize18,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            SizedBox(height: AppSizer().height1),
-
-                            /// Skip Button
-                            Center(
-                              child: TextButton(
-                                onPressed: () {
-                                  loginController.isLoggedIn.value = false;
-                                  Get.toNamed(AppRoutes.home);
-                                },
-                                child: Text(
-                                  "Skip for now",
-                                  style: TextStyle(
-                                    color: AppColors.appGrey.shade700,
-                                    fontSize: AppSizer().fontSize17,
-                                    fontWeight: FontWeight.bold,
+                                            "Send OTP",
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: AppSizer().fontSize18,
+                                            ),
+                                          ),
                                   ),
                                 ),
                               ),
@@ -231,7 +211,8 @@ class LogInScreen extends StatelessWidget {
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 8),
+                                    horizontal: 8,
+                                  ),
                                   child: Text(
                                     "or continue with",
                                     style: TextStyle(
@@ -254,10 +235,12 @@ class LogInScreen extends StatelessWidget {
 
                             /// Social Buttons
                             Center(
-                              child: _socialButton("assets/images/google (1).png",
-                                  onTap: () {
-                                    loginController.signInWithGoogle();
-                                  }),
+                              child: _socialButton(
+                                "assets/images/google (1).png",
+                                onTap: () {
+                                  loginController.signInWithGoogle();
+                                },
+                              ),
                             ),
 
                             SizedBox(height: AppSizer().height3),
@@ -320,9 +303,7 @@ class LogInScreen extends StatelessWidget {
             ),
           ],
         ),
-        child: Center(
-          child: Image.asset(assetPath, height: 28),
-        ),
+        child: Center(child: Image.asset(assetPath, height: 28)),
       ),
     );
   }

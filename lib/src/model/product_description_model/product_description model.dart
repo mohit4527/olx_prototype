@@ -14,6 +14,8 @@ class ProductModel {
   final String? challanUrl;
   final String? phoneNumber;
   final String? userId;
+  final bool isBoosted;
+  bool? status;
 
   ProductModel({
     required this.id,
@@ -31,6 +33,8 @@ class ProductModel {
     required this.createdAt,
     required this.imageUrl,
     this.userId,
+    this.isBoosted = false,
+    this.status,
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
@@ -85,6 +89,8 @@ class ProductModel {
               : null) ??
           (json['owner'] is Map ? json['owner']['phone']?.toString() : null) ??
           (json['seller'] is Map ? json['seller']['phone']?.toString() : null),
+      isBoosted: json['isBoosted'] ?? false,
+      status: json['status'] as bool?,
     );
   }
 
@@ -103,6 +109,7 @@ class ProductModel {
       "whatsapp": whatsapp,
       "challanUrl": challanUrl,
       "phoneNumber": phoneNumber,
+      "isBoosted": isBoosted,
     };
   }
 }

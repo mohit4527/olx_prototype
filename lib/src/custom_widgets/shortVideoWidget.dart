@@ -31,24 +31,27 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   void initState() {
     super.initState();
     _controller = VideoPlayerController.network(widget.videoUrl);
-    _controller.initialize().then((_) {
-      if (!mounted) return;
-      setState(() {
-        _isInitialized = true;
-        _initError = false;
-      });
-      _controller.setLooping(true);
-      // respect muted setting
-      _controller.setVolume(widget.muted ? 0.0 : 1.0);
-      _controller.play();
-    }).catchError((e) {
-      print("[VideoPlayerWidget] init error: $e");
-      if (mounted) {
-        setState(() {
-          _initError = true;
+    _controller
+        .initialize()
+        .then((_) {
+          if (!mounted) return;
+          setState(() {
+            _isInitialized = true;
+            _initError = false;
+          });
+          _controller.setLooping(true);
+          // respect muted setting
+          _controller.setVolume(widget.muted ? 0.0 : 1.0);
+          _controller.play();
+        })
+        .catchError((e) {
+          print("[VideoPlayerWidget] init error: $e");
+          if (mounted) {
+            setState(() {
+              _initError = true;
+            });
+          }
         });
-      }
-    });
   }
 
   @override
@@ -62,18 +65,21 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       _isInitialized = false;
       _initError = false;
       _controller = VideoPlayerController.network(widget.videoUrl);
-      _controller.initialize().then((_) {
-        if (!mounted) return;
-        setState(() {
-          _isInitialized = true;
-        });
-        _controller.setLooping(true);
-        _controller.setVolume(widget.muted ? 0.0 : 1.0);
-        _controller.play();
-      }).catchError((e) {
-        print('[VideoPlayerWidget] didUpdateWidget init error: $e');
-        if (mounted) setState(() => _initError = true);
-      });
+      _controller
+          .initialize()
+          .then((_) {
+            if (!mounted) return;
+            setState(() {
+              _isInitialized = true;
+            });
+            _controller.setLooping(true);
+            _controller.setVolume(widget.muted ? 0.0 : 1.0);
+            _controller.play();
+          })
+          .catchError((e) {
+            print('[VideoPlayerWidget] didUpdateWidget init error: $e');
+            if (mounted) setState(() => _initError = true);
+          });
     } else if (oldWidget.muted != widget.muted && _isInitialized) {
       // update volume if muted flag changed
       _controller.setVolume(widget.muted ? 0.0 : 1.0);
@@ -109,30 +115,32 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       },
       onTap: widget.enableTapToToggle ? togglePlayPause : null,
       child: _initError
-          ? const Center(child: Icon(Icons.broken_image))
-          : (_isInitialized
-              ? Stack(
-                  fit: StackFit.expand,
+          ? Container(
+              color: Colors.grey.shade200,
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    FittedBox(
-                      fit: BoxFit.cover,
-                      child: SizedBox(
-                        width: _controller.value.size.width,
-                        height: _controller.value.size.height,
-                        child: VideoPlayer(_controller),
-                      ),
+                    Icon(Icons.videocam_off, size: 48, color: Colors.grey),
+                    SizedBox(height: 8),
+                    Text(
+                      'Video not available',
+                      style: TextStyle(color: Colors.grey, fontSize: 14),
                     ),
-                    if (_showPlay)
-                      const Center(
-                        child: Icon(
-                          Icons.play_arrow,
-                          size: 80,
-                          color: Colors.white70,
-                        ),
-                      ),
                   ],
-                )
-              : const Center(child: CircularProgressIndicator())),
+                ),
+              ),
+            )
+          : (_isInitialized
+                ? FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: _controller.value.size.width,
+                      height: _controller.value.size.height,
+                      child: VideoPlayer(_controller),
+                    ),
+                  )
+                : const Center(child: CircularProgressIndicator())),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../utils/logger.dart';
 import '../model/short_video_model/short_video_model.dart';
@@ -253,12 +254,29 @@ class ShortVideoController extends GetxController {
   }
 
   // Upload a new video
-  Future<void> uploadVideo(File file, String title) async {
+  Future<void> uploadVideo(File file, String title, {String? productId}) async {
+    print('\n🚀 [ShortVideoController] uploadVideo() STARTED');
+    print('🚀 [ShortVideoController] File path: ${file.path}');
+    print('🚀 [ShortVideoController] File exists: ${file.existsSync()}');
+    print('🚀 [ShortVideoController] Title: $title');
+    print(
+      '🚀 [ShortVideoController] Product ID: ${productId ?? "No product linked"}',
+    );
+
     try {
+      print('🔄 [ShortVideoController] Setting isUploading = true');
       isUploading.value = true;
+
       final userId = currentUserId.value;
+      print(
+        '🔄 [ShortVideoController] Current userId: ${userId.isEmpty ? "EMPTY!" : userId}',
+      );
+
       // If we don't have a userId in controller, attempt to show what's in prefs
       if (userId.isEmpty) {
+        print(
+          '❌ [ShortVideoController] userId is EMPTY! Checking SharedPreferences...',
+        );
         try {
           final prefs = await SharedPreferences.getInstance();
           final prefUser =
@@ -266,6 +284,12 @@ class ShortVideoController extends GetxController {
           final hasToken =
               (prefs.getString('auth_token') ?? prefs.getString('token') ?? '')
                   .isNotEmpty;
+
+          print(
+            '🔍 [ShortVideoController] SharedPrefs userId: ${prefUser.isEmpty ? "EMPTY" : prefUser}',
+          );
+          print('🔍 [ShortVideoController] SharedPrefs has token: $hasToken');
+
           Get.snackbar(
             'Debug',
             'Resolved userId: ${prefUser.isNotEmpty ? prefUser : '<none>'} | auth_token present: ${hasToken ? 'yes' : 'no'}',
@@ -273,22 +297,37 @@ class ShortVideoController extends GetxController {
             duration: Duration(seconds: 4),
           );
         } catch (e) {
-          // ignore
+          print('❌ [ShortVideoController] Error checking SharedPrefs: $e');
         }
         // still return to avoid uploading without user context
+        print('❌ [ShortVideoController] ABORTING upload - no userId!');
         return;
       }
 
+      print(
+        '✅ [ShortVideoController] userId validated! Proceeding with upload...',
+      );
       Logger.d(
         'ShortVideoController',
         'uploadVideo start (file=${file.path}, title=$title)',
       );
+
+      print('📤 [ShortVideoController] Calling ApiService.uploadVideo()...');
+      print(
+        '📤 [ShortVideoController] Parameters: videoPath=${file.path}, title=$title, productId=${productId ?? userId}',
+      );
+
       final uploadedVideo = await _api.uploadVideo(
         videoPath: file.path,
         title: title,
-        productId: userId,
+        productId:
+            productId ??
+            userId, // Use selected product ID or fallback to userId
         duration: 15,
       );
+
+      print('✅ [ShortVideoController] ApiService.uploadVideo() SUCCESS!');
+      print('✅ [ShortVideoController] Uploaded video ID: ${uploadedVideo.id}');
 
       // Insert into local short videos list immediately so user sees their upload.
       videos.insert(0, uploadedVideo);
@@ -343,25 +382,38 @@ class ShortVideoController extends GetxController {
         Logger.d('ShortVideoController', 'Could not refresh AdsController: $e');
       }
       // Navigate to short video screen showing the new upload immediately.
+      // Use offAllNamed to clear navigation stack and prevent going back to upload screen
       try {
-        Get.offNamed(AppRoutes.shortVideo, arguments: uploadedVideo.id);
+        Get.offAllNamed(AppRoutes.home);
+        Get.toNamed(AppRoutes.shortVideo, arguments: uploadedVideo.id);
       } catch (e) {
         Logger.d('ShortVideoController', 'Navigation after upload failed: $e');
       }
     } catch (e) {
+      print('\n❌❌❌ [ShortVideoController] UPLOAD ERROR! ❌❌❌');
+      print('❌ Error: $e');
+      print('❌ Error type: ${e.runtimeType}');
+      print('❌ Stack trace:');
+      print(StackTrace.current);
+
       Logger.d('ShortVideoController', 'uploadVideo error: $e');
       try {
         Get.snackbar(
           'Upload failed',
           e.toString(),
           snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: Duration(seconds: 5),
         );
       } catch (_) {
-        // ignore if Get context not available
+        print('❌ [ShortVideoController] Could not show error snackbar');
       }
     } finally {
       // Ensure uploading flag is cleared regardless of outcome
+      print('🔄 [ShortVideoController] Setting isUploading = false');
       isUploading.value = false;
+      print('✅ [ShortVideoController] uploadVideo() FINISHED\n');
     }
   }
 }

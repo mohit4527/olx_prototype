@@ -12,8 +12,11 @@ import 'package:olx_prototype/src/view/home/chat_details/chat_details_screen.dar
 import 'package:olx_prototype/src/view/home/dealer/dealer_screen.dart';
 import 'package:olx_prototype/src/view/home/dealer_bookTestDrives_screen/dealer_bookTestDrives_Screen.dart';
 import 'package:olx_prototype/src/view/home/dealer_history_screen/dealer_history_screen.dart';
+import 'package:olx_prototype/src/view/home/offer_status/offer_status_screen.dart';
 import 'package:olx_prototype/src/view/home/dealer_products_description/dealer_product_description_screen.dart';
 import 'package:olx_prototype/src/view/home/dealer_products_screen/dealer_products_screen.dart';
+import 'package:olx_prototype/src/view/home/all_dealers/all_dealers_screen.dart';
+import 'package:olx_prototype/src/view/home/dealer_detail/dealer_detail_screen.dart';
 import 'package:olx_prototype/src/view/home/description/description_screen.dart';
 import 'package:olx_prototype/src/view/home/edit_dealer_profile/edit_dealer_profile_screen.dart';
 import 'package:olx_prototype/src/view/home/fuel_screen/fuel_screen.dart';
@@ -38,7 +41,11 @@ import 'package:olx_prototype/src/view/splash/welcome_screen.dart';
 import '../view/home/book_test_driveScreen/book_testdrive_screen.dart';
 import '../view/home/sell_user_cars/sell_user_car_screen.dart';
 import '../view/home/ads/edit_product_screen.dart';
+import '../view/home/city_products_screen/city_products_screen.dart';
 import '../model/all_product_model/all_product_model.dart';
+import '../view/test/subscription_test_screen_simple.dart';
+import '../view/home/location_settings/location_settings_screen.dart';
+import '../view/home/location_settings/filtered_products_screen.dart';
 
 class AppRoutes {
   static String splash = "/splash_screen";
@@ -60,6 +67,7 @@ class AppRoutes {
   static String notifications = "/notification_screen";
   static String history = "/history_screen";
   static String dealer_history_screen = "/dealer_history_screen";
+  static String offer_status = "/offer_status_screen";
   static String verify_otp = "/verify_otp_screen";
   static String privacy_screen = "/privacy_screen";
   static String help_support = "/help_support_screen";
@@ -67,6 +75,7 @@ class AppRoutes {
   static String dealer = "/dealer_screen";
   static String fuel_screen = "/fuel_screen";
   static String bikes_market = "/bikes_market";
+  static String subscription_test = "/subscription_test_screen";
   static String wishlist_screen = "/wishlist_screen";
   static String aids_screen = "/aids_screen";
   static String ads = "/ads_screen";
@@ -74,11 +83,16 @@ class AppRoutes {
   static String edit_product = "/edit_product_screen";
   static String all_products_screen = "/all_products_screen";
   static String dealer_products_screen = "/dealer_products_Screen";
+  static String city_products_screen = "/city_products_screen";
   static String video_uploadScreen = "/video_uploadScreen";
   static String book_test_driveScreen = "/book_testdrive_screen";
   static String dealer_bookTestDrives_screen = "/dealer_bookTestDrives_screen";
   static String dealer_product_description =
       "/dealer_product_description_Screen";
+  static String all_dealers_screen = "/all_dealers_screen";
+  static String dealer_detail_screen = "/dealer_detail_screen";
+  static String location_settings = "/location_settings_screen";
+  static String filtered_products = "/filtered_products";
 }
 
 final Getpages = [
@@ -94,10 +108,22 @@ final Getpages = [
     page: () {
       final dynamic arg = Get.arguments;
       String carId = '';
+
+      // Handle different argument types
       if (arg is String) {
         carId = arg;
-      } else if (arg is Map && arg['carId'] != null) {
-        carId = arg['carId'].toString();
+      } else if (arg is Map) {
+        // Check if it's productData format from city_products_screen
+        if (arg['productData'] != null) {
+          final productData = arg['productData'] as Map<String, dynamic>;
+          carId = productData['id']?.toString() ?? '';
+          print('[AppRoutes] Found productData format with id: $carId');
+        } else if (arg['carId'] != null) {
+          carId = arg['carId'].toString();
+        } else {
+          // Try to extract any ID field
+          carId = arg['id']?.toString() ?? arg['_id']?.toString() ?? '';
+        }
       } else if (arg != null) {
         carId = arg.toString();
       }
@@ -163,6 +189,7 @@ final Getpages = [
     name: AppRoutes.dealer_history_screen,
     page: () => DealerHistoryScreen(),
   ),
+  GetPage(name: AppRoutes.offer_status, page: () => OfferStatusScreen()),
   GetPage(name: AppRoutes.verify_otp, page: () => VerifyOtpScreen()),
   GetPage(name: AppRoutes.book_test_driveScreen, page: () => TestDriveScreen()),
   GetPage(
@@ -190,6 +217,27 @@ final Getpages = [
   GetPage(name: AppRoutes.bikes_market, page: () => BikesMarket()),
   GetPage(name: AppRoutes.wishlist_screen, page: () => WishlistScreen()),
   GetPage(name: AppRoutes.video_uploadScreen, page: () => PostVideoScreen()),
+  GetPage(
+    name: AppRoutes.location_settings,
+    page: () => LocationSettingsScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.filtered_products,
+    page: () => const FilteredProductsScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.city_products_screen,
+    page: () {
+      final args = Get.arguments;
+      String cityName = '';
+      if (args is Map) {
+        cityName = args['cityName']?.toString() ?? 'Unknown City';
+      } else if (args is String) {
+        cityName = args;
+      }
+      return CityProductsScreen(cityName: cityName);
+    },
+  ),
   GetPage(
     name: AppRoutes.edit_product,
     page: () {
@@ -226,6 +274,29 @@ final Getpages = [
         productId = arg.toString();
       }
       return DealerDescriptionScreen(productId: productId);
+    },
+  ),
+  GetPage(
+    name: AppRoutes.subscription_test,
+    page: () => const SubscriptionTestScreenSimple(),
+  ),
+  GetPage(
+    name: AppRoutes.all_dealers_screen,
+    page: () => const AllDealersScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.dealer_detail_screen,
+    page: () {
+      final dynamic arg = Get.arguments;
+      String dealerId = '';
+      if (arg is String) {
+        dealerId = arg;
+      } else if (arg is Map && arg['dealerId'] != null) {
+        dealerId = arg['dealerId'].toString();
+      } else if (arg != null) {
+        dealerId = arg.toString();
+      }
+      return DealerDetailScreen(dealerId: dealerId);
     },
   ),
 ];

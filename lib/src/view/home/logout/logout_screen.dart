@@ -258,12 +258,20 @@ class LogoutScreen extends StatelessWidget {
                             final TokenController tokenController =
                                 Get.find<TokenController>();
                             await tokenController.clearToken();
-                            Get.offAllNamed(AppRoutes.login);
+                            // Clear all user data
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.clear();
+                            // Navigate to welcome screen (dashboard)
+                            Get.offAllNamed(AppRoutes.welcome);
                           },
                           child: const Text("Yes"),
                         ),
                         TextButton(
-                          onPressed: () => Get.back(),
+                          onPressed: () {
+                            if (Navigator.canPop(context)) {
+                              Navigator.pop(context);
+                            }
+                          },
                           child: const Text("Cancel"),
                         ),
                       ],

@@ -36,6 +36,7 @@ class AppCustomWidgets {
         controller: controller,
         validator: validator,
         keyboardType: keyboardType,
+        textCapitalization: TextCapitalization.words,
         inputFormatters: inputFormatters, // <-- NEW
         decoration: InputDecoration(
           prefixIcon: icon,
@@ -97,6 +98,7 @@ class AppCustomWidgets {
       child: TextFormField(
         controller: controller,
         validator: validator,
+        textCapitalization: TextCapitalization.sentences,
         inputFormatters: inputFormatters,
         maxLines: 4,
         decoration: InputDecoration.collapsed(hintText: hint),

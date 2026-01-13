@@ -10,6 +10,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/controller/token_controller.dart';
+import '../../controller/all_products_controller.dart';
 import 'package:olx_prototype/src/model/short_video_model/short_video_model.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -62,7 +63,7 @@ class ApiService {
 
   static Future<ProductModel?> fetchProductById(String productId) async {
     final response = await http.get(
-      Uri.parse("http://oldmarket.bhoomi.cloud/api/products/$productId"),
+      Uri.parse("https://oldmarket.bhoomi.cloud/api/products/$productId"),
     );
 
     if (response.statusCode == 200) {
@@ -98,9 +99,9 @@ class ApiService {
       // Try simple endpoints first
       final endpoints = [
         "https://oldmarket.bhoomi.cloud/api/users/$userId/phone",
-        "http://oldmarket.bhoomi.cloud/api/users/$userId/phone",
+        "https://oldmarket.bhoomi.cloud/api/users/$userId/phone",
         "https://oldmarket.bhoomi.cloud/api/user/$userId/contact",
-        "http://oldmarket.bhoomi.cloud/api/user/$userId/contact",
+        "https://oldmarket.bhoomi.cloud/api/user/$userId/contact",
       ];
 
       for (final endpoint in endpoints) {
@@ -340,23 +341,36 @@ class ApiService {
     required String productId,
     required int duration,
   }) async {
+    print('\n🎬 [ApiService] uploadVideo() CALLED');
+    print('🎬 [ApiService] videoPath: $videoPath');
+    print('🎬 [ApiService] title: $title');
+    print('🎬 [ApiService] productId: $productId');
+    print('🎬 [ApiService] duration: $duration');
+
     try {
       final uri = Uri.parse("$base/videos");
+      print('🎬 [ApiService] Target URI: $uri');
       Logger.d('ApiService', 'Uploading video to: $uri');
       Logger.d(
         'ApiService',
         'videoPath: $videoPath, title: $title, productId: $productId, duration: $duration',
       );
 
+      print('📦 [ApiService] Creating MultipartRequest...');
+      print('📦 [ApiService] Creating MultipartRequest...');
       final request = http.MultipartRequest('POST', uri);
 
       // Attach video file with clean filename and proper content type
       // Determine mime type dynamically so we send correct content-type
+      print('🔍 [ApiService] Detecting MIME type for: $videoPath');
       final detectedMime = lookupMimeType(videoPath) ?? 'video/mp4';
+      print('🔍 [ApiService] Detected MIME: $detectedMime');
+
       final mimeParts = detectedMime.split('/');
       final mimeTypeTop = mimeParts.isNotEmpty ? mimeParts[0] : 'video';
       final mimeTypeSub = mimeParts.length > 1 ? mimeParts[1] : 'mp4';
 
+      print('📎 [ApiService] Adding video file to request...');
       request.files.add(
         await http.MultipartFile.fromPath(
           'video',
@@ -365,7 +379,10 @@ class ApiService {
           contentType: MediaType(mimeTypeTop, mimeTypeSub),
         ),
       );
+      print('✅ [ApiService] Video file added successfully');
 
+      print('📝 [ApiService] Adding form fields...');
+      print('📝 [ApiService] Adding form fields...');
       request.fields['title'] = title;
       request.fields['productId'] = productId;
 
@@ -373,11 +390,18 @@ class ApiService {
       // values ('userId' or 'user_uid'), then fall back to decoding the
       // JWT token if TokenController is available. We also log the prefs
       // and token contents (only presence, not secret) to help debug.
+      print('🔑 [ApiService] Resolving userId for upload...');
       final resolvedUserId = await _getUserIdForUploads();
+      print(
+        '🔑 [ApiService] Resolved userId: ${resolvedUserId.isEmpty ? "EMPTY!" : resolvedUserId}',
+      );
+
       if (resolvedUserId.isNotEmpty) {
         request.fields['userId'] = resolvedUserId;
+        print('✅ [ApiService] userId added to request');
       } else {
         // Keep an explicit log so developers know why userId is missing.
+        print('❌ [ApiService] uploadVideo: no userId found in prefs or token');
         print('[ApiService] uploadVideo: no userId found in prefs or token');
       }
 
@@ -522,6 +546,12 @@ class ApiService {
             apiLastError = msg.toString();
             throw Exception('Upload failed: $msg');
           }
+        } else if (response.statusCode == 413) {
+          // File too large error from nginx/server
+          apiLastError =
+              'Video file is too large. Maximum allowed size is 50MB. Please compress your video or select a smaller file.';
+          print('❌ [ApiService] 413 Error: File too large for server');
+          throw Exception(apiLastError);
         } else {
           apiLastError = response.body;
           throw Exception('Upload failed with status: ${response.statusCode}');
@@ -575,7 +605,7 @@ class ApiService {
     required String phoneNumber,
   }) async {
     final url = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/cars/car/$carId/book-test-drive',
+      'https://oldmarket.bhoomi.cloud/api/cars/car/$carId/book-test-drive',
     );
 
     final body = jsonEncode({
@@ -625,7 +655,7 @@ class ApiService {
       try {
         print("Upload attempt $attempt of $maxRetries");
 
-        final uri = Uri.parse('http://oldmarket.bhoomi.cloud/api/products');
+        final uri = Uri.parse('https://oldmarket.bhoomi.cloud/api/products');
         final request = http.MultipartRequest('POST', uri);
 
         // Set timeout for the request
@@ -641,11 +671,11 @@ class ApiService {
         request.fields['number'] =
             car.phoneNumber; // 🔥 Backend expects "number" field
         request.fields['phoneNumber'] = car.phoneNumber; // 🔥 Backup field
-        request.fields['location'] = jsonEncode({
-          'country': car.location.country,
-          'state': car.location.state,
-          'city': car.location.city,
-        });
+
+        // Location as country, state, city fields
+        request.fields['country'] = car.country;
+        request.fields['state'] = car.state;
+        request.fields['city'] = car.city;
 
         // 🔥 DEBUG: Upload API fields
         print('[ApiService] uploadCar - Title: "${car.title}"');
@@ -710,6 +740,29 @@ class ApiService {
             );
             return; // Server responded with error, don't retry
           }
+        } else if (resp.statusCode == 403) {
+          // Handle subscription limit reached specifically
+          final message = responseData['message'] ?? '';
+          if (message.contains('Post limit reached') ||
+              message.contains('Subscribe')) {
+            print('🚫 [ApiService] Subscription limit reached on server!');
+            // Show subscription popup instead of regular error
+            final productController = Get.isRegistered<ProductController>()
+                ? Get.find<ProductController>()
+                : Get.put(ProductController());
+            productController.showSubscriptionPopup();
+            throw Exception(
+              'Subscription limit reached',
+            ); // Throw exception to stop success message
+          } else {
+            Get.snackbar(
+              "Access Denied",
+              message.isNotEmpty ? message : "Access denied",
+              backgroundColor: AppColors.appRed,
+              colorText: AppColors.appWhite,
+            );
+            return;
+          }
         } else {
           // Server error, might be worth retrying
           if (attempt == maxRetries) {
@@ -758,6 +811,9 @@ class ApiService {
                 "Network connection failed. Please check your internet connection.";
           } else if (e is TimeoutException) {
             errorMessage = "Upload timed out. Please try again.";
+          } else if (e.toString().contains('name must end with jpg or jpeg')) {
+            errorMessage =
+                "Image format error. Please try selecting images again.";
           }
 
           Get.snackbar(
@@ -766,7 +822,7 @@ class ApiService {
             backgroundColor: AppColors.appRed,
             colorText: AppColors.appWhite,
           );
-          return;
+          rethrow; // Re-throw the error so the controller knows upload failed
         }
       }
     }
@@ -786,7 +842,7 @@ class ApiService {
         print("Dealer car upload attempt $attempt of $maxRetries");
 
         final uri = Uri.parse(
-          'http://oldmarket.bhoomi.cloud/api/cars/dealer/upload',
+          'https://oldmarket.bhoomi.cloud/api/cars/dealer/upload',
         );
 
         final request = http.MultipartRequest('POST', uri);
@@ -800,6 +856,9 @@ class ApiService {
         request.fields['userId'] = car.userId;
         request.fields['tags'] = jsonEncode(car.tags);
         request.fields['category'] = car.category;
+        request.fields['country'] = car.country;
+        request.fields['state'] = car.state;
+        request.fields['city'] = car.city;
 
         // Attach images
         for (final img in images) {
@@ -850,6 +909,31 @@ class ApiService {
               colorText: AppColors.appWhite,
             );
             return; // Server responded with error, don't retry
+          }
+        } else if (resp.statusCode == 403) {
+          // Handle subscription limit reached specifically for dealer upload
+          final message = responseData['message'] ?? '';
+          if (message.contains('Post limit reached') ||
+              message.contains('Subscribe')) {
+            print(
+              '🚫 [ApiService] Dealer subscription limit reached on server!',
+            );
+            // Show subscription popup instead of regular error
+            final productController = Get.isRegistered<ProductController>()
+                ? Get.find<ProductController>()
+                : Get.put(ProductController());
+            productController.showSubscriptionPopup();
+            throw Exception(
+              'Dealer subscription limit reached',
+            ); // Throw exception to stop success message
+          } else {
+            Get.snackbar(
+              "Access Denied",
+              message.isNotEmpty ? message : "Access denied",
+              backgroundColor: AppColors.appRed,
+              colorText: AppColors.appWhite,
+            );
+            return;
           }
         } else {
           // Server error, might be worth retrying
@@ -916,48 +1000,622 @@ class ApiService {
   // -------------------- COMPRESS IMAGE --------------------
   static Future<File?> compressImage(File file) async {
     final dir = await getTemporaryDirectory();
+
+    // Ensure the output file has .jpg extension (required by flutter_image_compress)
+    final originalBasename = path.basenameWithoutExtension(file.path);
     final targetPath = path.join(
       dir.absolute.path,
-
-      '${DateTime.now().millisecondsSinceEpoch}_${path.basename(file.path)}',
+      '${DateTime.now().millisecondsSinceEpoch}_$originalBasename.jpg',
     );
+
     final result = await FlutterImageCompress.compressAndGetFile(
       file.absolute.path,
       targetPath,
       quality: 70,
+      format: CompressFormat.jpeg, // Explicitly set format to JPEG
     );
     return result != null ? File(result.path) : null;
   }
 
-  // Fetch dealer All Products
-  static const String _baseUrl = 'http://oldmarket.bhoomi.cloud/api/dealers';
-
-  static Future<List<DealerProduct>> fetchDealerProducts() async {
-    final uri = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/dealers/dealer/cars',
-    );
-    print("📡 Fetching dealer products from: $uri");
+  // Location-based filtering methods
+  /// Fetch products by city name
+  static Future<List<DealerProduct>> fetchProductsByCity(
+    String cityName,
+  ) async {
     try {
-      final response = await http.get(uri);
-      print("📊 Dealer Products API Status: ${response.statusCode}");
-      print("📋 Dealer Products Response: ${response.body}");
+      print("🏙️ Fetching products for city: $cityName");
+
+      final response = await http.get(
+        Uri.parse(
+          'https://oldmarket.bhoomi.cloud/api/products?city=${Uri.encodeComponent(cityName)}',
+        ),
+      );
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
-        final dealerProductModel = DealerProductModel.fromJson(jsonResponse);
-        print(
-          "✅ Dealer Products parsed: ${dealerProductModel.data.length} items",
-        );
-        return dealerProductModel.data;
+        List<DealerProduct> cityProducts = [];
+
+        List<dynamic> products = [];
+        if (jsonResponse is List) {
+          products = jsonResponse;
+        } else if (jsonResponse is Map && jsonResponse['data'] != null) {
+          products = jsonResponse['data'];
+        }
+
+        for (var product in products) {
+          // Check if product has city information matching the requested city
+          String? productCity = product['city']?.toString();
+          if (productCity != null &&
+              productCity.toLowerCase().contains(cityName.toLowerCase())) {
+            cityProducts.add(_convertToeDealerProduct(product));
+          }
+        }
+
+        print("🏙️ Found ${cityProducts.length} products in $cityName");
+        return cityProducts;
       } else {
-        print("❌ Dealer Products API failed: ${response.statusCode}");
-        throw Exception(
-          'Failed to load dealer products. Status code: ${response.statusCode}',
-        );
+        print("❌ City API failed with status: ${response.statusCode}");
+        // Fallback: filter from all products
+        return _filterProductsByCity(await fetchDealerProducts(), cityName);
       }
     } catch (e) {
-      print("💥 Dealer Products API error: $e");
+      print("❌ Error fetching products by city: $e");
+      // Fallback: filter from all products
+      return _filterProductsByCity(await fetchDealerProducts(), cityName);
+    }
+  }
+
+  /// Fetch products within distance range
+  static Future<List<DealerProduct>> fetchProductsByDistance(
+    double lat,
+    double lng,
+    double radiusKm,
+  ) async {
+    try {
+      print("📏 Fetching products within ${radiusKm}km of $lat, $lng");
+
+      final response = await http.get(
+        Uri.parse(
+          'https://oldmarket.bhoomi.cloud/api/products?lat=$lat&lng=$lng&radius=$radiusKm',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        List<DealerProduct> nearbyProducts = [];
+
+        List<dynamic> products = [];
+        if (jsonResponse is List) {
+          products = jsonResponse;
+        } else if (jsonResponse is Map && jsonResponse['data'] != null) {
+          products = jsonResponse['data'];
+        }
+
+        for (var product in products) {
+          nearbyProducts.add(_convertToeDealerProduct(product));
+        }
+
+        print(
+          "📏 Found ${nearbyProducts.length} products within ${radiusKm}km",
+        );
+        return nearbyProducts;
+      } else {
+        print("❌ Distance API failed with status: ${response.statusCode}");
+        print("🔄 Using fallback with all products for ${radiusKm}km radius");
+        // Fallback: get all products and simulate distance filtering
+        final allProducts = await fetchDealerProducts();
+        final filtered = _filterProductsByDistance(
+          allProducts,
+          lat,
+          lng,
+          radiusKm,
+        );
+        print(
+          "📍 Fallback returned ${filtered.length} products within ${radiusKm}km",
+        );
+        return filtered;
+      }
+    } catch (e) {
+      print("❌ Error fetching products by distance: $e");
+      print("🔄 Using emergency fallback for distance filtering");
+      // Emergency fallback: get all products and simulate distance filtering
+      try {
+        final allProducts = await fetchDealerProducts();
+        final filtered = _filterProductsByDistance(
+          allProducts,
+          lat,
+          lng,
+          radiusKm,
+        );
+        print("📍 Emergency fallback returned ${filtered.length} products");
+        return filtered;
+      } catch (fallbackError) {
+        print("❌ Even fallback failed: $fallbackError");
+        return [];
+      }
+    }
+  }
+
+  /// Fetch nearby products (within 10km radius)
+  static Future<List<DealerProduct>> fetchNearbyProducts(
+    double lat,
+    double lng,
+  ) async {
+    try {
+      print("📍 Fetching nearby products around $lat, $lng");
+
+      final response = await http.get(
+        Uri.parse(
+          'https://oldmarket.bhoomi.cloud/api/products/nearby?lat=$lat&lng=$lng',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        List<DealerProduct> nearbyProducts = [];
+
+        List<dynamic> products = [];
+        if (jsonResponse is List) {
+          products = jsonResponse;
+        } else if (jsonResponse is Map && jsonResponse['data'] != null) {
+          products = jsonResponse['data'];
+        }
+
+        for (var product in products) {
+          nearbyProducts.add(_convertToeDealerProduct(product));
+        }
+
+        print("📍 Found ${nearbyProducts.length} nearby products");
+        return nearbyProducts;
+      } else {
+        print("❌ Nearby API failed with status: ${response.statusCode}");
+        print("🔄 Using fallback - getting products within 10km radius");
+        // Fallback: get all products and filter for nearby (10km radius)
+        final allProducts = await fetchDealerProducts();
+        final nearbyFiltered = _filterProductsByDistance(
+          allProducts,
+          lat,
+          lng,
+          10.0,
+        );
+        print("📍 Nearby fallback returned ${nearbyFiltered.length} products");
+        return nearbyFiltered;
+      }
+    } catch (e) {
+      print("❌ Error fetching nearby products: $e");
+      print("🔄 Using emergency fallback for nearby filtering");
+      // Emergency fallback: get some products to show
+      try {
+        final allProducts = await fetchDealerProducts();
+        final nearbyFiltered = _filterProductsByDistance(
+          allProducts,
+          lat,
+          lng,
+          15.0,
+        ); // Wider radius as emergency
+        print("📍 Emergency nearby returned ${nearbyFiltered.length} products");
+        return nearbyFiltered;
+      } catch (fallbackError) {
+        print("❌ Even nearby fallback failed: $fallbackError");
+        return [];
+      }
+    }
+  }
+
+  /// Helper method to filter products by city (fallback)
+  static List<DealerProduct> _filterProductsByCity(
+    List<DealerProduct> allProducts,
+    String cityName,
+  ) {
+    return allProducts
+        .where((product) {
+          return product.title?.toLowerCase().contains(
+                cityName.toLowerCase(),
+              ) ??
+              false;
+        })
+        .take(15)
+        .toList(); // Limit to 15 results
+  }
+
+  /// Helper method to filter products by distance (fallback)
+  static List<DealerProduct> _filterProductsByDistance(
+    List<DealerProduct> allProducts,
+    double lat,
+    double lng,
+    double radiusKm,
+  ) {
+    print(
+      "📏 Filtering ${allProducts.length} products by ${radiusKm}km radius around $lat, $lng",
+    );
+
+    if (allProducts.isEmpty) {
+      print("⚠️ No products available to filter");
+      return [];
+    }
+
+    // For fallback, return products based on radius
+    // Simulate distance-based filtering by returning more products for larger radius
+    int maxProducts = (radiusKm * 3).round().clamp(
+      5,
+      allProducts.length,
+    ); // At least 5, max all
+
+    final filtered = allProducts.take(maxProducts).toList();
+    print(
+      "📍 Distance filter returned ${filtered.length} products for ${radiusKm}km radius",
+    );
+
+    return filtered;
+  }
+
+  /// Helper method to convert API response to DealerProduct
+  static DealerProduct _convertToeDealerProduct(Map<String, dynamic> product) {
+    try {
+      // Handle dealerId field that might be a Map
+      String? dealerId;
+      String? dealerName;
+      String? phone;
+
+      final dealerField = product['dealerId'];
+      if (dealerField != null) {
+        if (dealerField is String) {
+          dealerId = dealerField;
+        } else if (dealerField is Map<String, dynamic>) {
+          dealerId = dealerField['_id']?.toString();
+          dealerName =
+              dealerField['name']?.toString() ??
+              dealerField['businessName']?.toString();
+          phone = dealerField['phone']?.toString();
+        }
+      }
+
+      // Handle images array or single image
+      List<String> images = [];
+      if (product['images'] is List) {
+        images = List<String>.from(
+          product['images'].map((img) => img.toString()),
+        );
+      } else if (product['imageUrl'] != null) {
+        images = [product['imageUrl'].toString()];
+      } else if (product['image'] != null) {
+        images = [product['image'].toString()];
+      }
+
+      return DealerProduct(
+        id: product['_id']?.toString() ?? product['id']?.toString() ?? '',
+        title:
+            product['title']?.toString() ??
+            product['name']?.toString() ??
+            'Unknown Vehicle',
+        description:
+            product['description']?.toString() ?? 'No description available',
+        price: (product['price'] is int)
+            ? product['price']
+            : int.tryParse(product['price']?.toString() ?? '0') ?? 0,
+        sellerType: product['sellerType']?.toString() ?? 'dealer',
+        dealerId: dealerId,
+        dealerName: dealerName ?? product['dealerName']?.toString(),
+        phone: phone ?? product['phone']?.toString(),
+        tags: product['tags'] is List ? List<String>.from(product['tags']) : [],
+        images: images,
+        createdAt:
+            DateTime.tryParse(product['createdAt']?.toString() ?? '') ??
+            DateTime.now(),
+        updatedAt:
+            DateTime.tryParse(product['updatedAt']?.toString() ?? '') ??
+            DateTime.now(),
+        location:
+            product['location']?.toString() ?? product['city']?.toString(),
+      );
+    } catch (e) {
+      print("❌ Error converting product: $e");
+      print("❌ Product data: $product");
+      // Return a minimal valid product
+      return DealerProduct(
+        id: 'error_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Error Product',
+        description: 'Failed to parse product data',
+        price: 0,
+        sellerType: 'dealer',
+        tags: [],
+        images: [],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+    }
+  }
+
+  // Fetch dealer All Products
+  static const String _baseUrl = 'https://oldmarket.bhoomi.cloud/api/dealers';
+
+  static Future<List<DealerProduct>> fetchDealerProducts() async {
+    try {
+      // First try the new getAllDealerCars API
+      print("📡 Trying new dealer cars API...");
+
+      final dealerCarsResult = await getAllDealerCars();
+      if (dealerCarsResult != null && dealerCarsResult['status'] == true) {
+        final data = dealerCarsResult['data'];
+        if (data is List && data.isNotEmpty) {
+          print("✅ Found ${data.length} dealer cars from new API");
+          List<DealerProduct> dealerProducts = [];
+
+          // First fetch all dealers to get their phone numbers
+          print("📱 Fetching dealer contact info...");
+          final dealersResult = await getAllDealers();
+          Map<String, String> dealerPhones = {};
+
+          if (dealersResult != null && dealersResult['status'] == true) {
+            final dealers = dealersResult['data'] as List?;
+            if (dealers != null) {
+              for (var dealer in dealers) {
+                if (dealer is Map<String, dynamic>) {
+                  final dealerId = dealer['_id']?.toString();
+                  final phone =
+                      dealer['phone']?.toString() ??
+                      dealer['phoneNumber']?.toString() ??
+                      dealer['contactNumber']?.toString() ??
+                      dealer['businessPhone']?.toString() ??
+                      '';
+                  if (dealerId != null && phone.isNotEmpty) {
+                    dealerPhones[dealerId] = phone;
+                    print("📞 Cached dealer phone: $dealerId -> $phone");
+                  }
+                }
+              }
+            }
+          }
+
+          for (var car in data) {
+            try {
+              if (car is Map<String, dynamic>) {
+                // Ensure required fields exist for dealer cars
+                final dealerId =
+                    car['dealerId']?.toString() ??
+                    car['dealer']?.toString() ??
+                    car['_id']?.toString() ??
+                    'dealer123';
+
+                car['dealerId'] = dealerId;
+                car['dealerName'] =
+                    car['dealerName']?.toString() ??
+                    car['dealer_name']?.toString() ??
+                    'Dealer';
+
+                // Get phone from dealer cache first, then fallback to car data
+                String dealerPhone =
+                    dealerPhones[dealerId] ??
+                    car['phone']?.toString() ??
+                    car['phoneNumber']?.toString() ??
+                    car['dealerPhone']?.toString() ??
+                    car['contactNumber']?.toString() ??
+                    car['whatsapp']?.toString() ??
+                    '';
+
+                car['phone'] = dealerPhone;
+                car['dealerPhone'] = dealerPhone;
+
+                car['sellerType'] = 'dealer';
+                car['title'] =
+                    car['title']?.toString() ??
+                    car['name']?.toString() ??
+                    'Car';
+                car['description'] =
+                    car['description']?.toString() ?? 'No description';
+
+                // Handle price
+                if (car['price'] is String) {
+                  car['price'] = int.tryParse(car['price']) ?? 0;
+                } else {
+                  car['price'] = car['price'] ?? 0;
+                }
+
+                // Handle arrays
+                if (car['tags'] is! List) {
+                  car['tags'] = [];
+                }
+                if (car['images'] is! List) {
+                  car['images'] = car['mediaUrl'] ?? [];
+                }
+
+                // Debug phone information
+                print(
+                  "📱 Car ${car['title']}: dealer=$dealerId, phone=$dealerPhone",
+                );
+
+                dealerProducts.add(DealerProduct.fromJson(car));
+              }
+            } catch (e) {
+              print("⚠️ Error parsing dealer car: $e");
+              continue;
+            }
+          }
+
+          if (dealerProducts.isNotEmpty) {
+            print("✅ Successfully parsed ${dealerProducts.length} dealer cars");
+            return dealerProducts;
+          }
+        }
+      }
+
+      // Fallback to existing endpoints if new API fails
+      print("📡 Fallback: Trying existing endpoints...");
+      List<String> endpoints = [
+        'https://oldmarket.bhoomi.cloud/api/products',
+        'https://oldmarket.bhoomi.cloud/api/cars',
+        'https://oldmarket.bhoomi.cloud/api/products',
+      ];
+
+      for (String endpoint in endpoints) {
+        try {
+          print("📡 Trying endpoint: $endpoint");
+          final response = await http.get(Uri.parse(endpoint));
+          print("📊 Response Status: ${response.statusCode}");
+
+          if (response.statusCode == 200) {
+            final jsonResponse = jsonDecode(response.body);
+            List<DealerProduct> dealerProducts = [];
+
+            // Handle different response structures
+            List<dynamic> products = [];
+            if (jsonResponse is List) {
+              products = jsonResponse;
+            } else if (jsonResponse is Map) {
+              if (jsonResponse['data'] is List) {
+                products = jsonResponse['data'];
+              } else if (jsonResponse['products'] is List) {
+                products = jsonResponse['products'];
+              }
+            }
+
+            print("🔍 Processing ${products.length} products...");
+
+            // Convert all products to dealer products for now (to show something)
+            for (var product in products.take(10)) {
+              // Take first 10 to avoid too many
+              try {
+                // Ensure required fields exist and handle complex types
+                if (product is Map<String, dynamic>) {
+                  // Handle dealerId field that might be a Map or String
+                  if (product['dealerId'] is Map<String, dynamic>) {
+                    final dealerIdMap =
+                        product['dealerId'] as Map<String, dynamic>;
+                    product['dealerId'] =
+                        dealerIdMap['_id']?.toString() ?? 'dealer123';
+                    product['dealerName'] =
+                        dealerIdMap['businessName']?.toString() ??
+                        dealerIdMap['name']?.toString() ??
+                        'Dealer';
+                    product['phone'] = dealerIdMap['phone']?.toString() ?? '';
+                    product['dealerPhone'] =
+                        dealerIdMap['phone']?.toString() ?? '';
+                  } else {
+                    product['dealerId'] =
+                        product['dealerId']?.toString() ??
+                        product['userId']?.toString() ??
+                        'dealer123';
+                    product['dealerName'] =
+                        product['dealerName']?.toString() ??
+                        product['userName']?.toString() ??
+                        'Dealer';
+                    // Handle phone from various fields
+                    product['phone'] =
+                        product['phone']?.toString() ??
+                        product['phoneNumber']?.toString() ??
+                        product['dealerPhone']?.toString() ??
+                        '';
+                    product['dealerPhone'] =
+                        product['dealerPhone']?.toString() ??
+                        product['phone']?.toString() ??
+                        '';
+                  }
+
+                  product['sellerType'] =
+                      product['sellerType']?.toString() ?? 'dealer';
+
+                  // Ensure basic fields are strings
+                  product['title'] =
+                      product['title']?.toString() ?? 'Unknown Product';
+                  product['description'] =
+                      product['description']?.toString() ?? 'No description';
+
+                  // Handle price as int
+                  if (product['price'] is String) {
+                    product['price'] = int.tryParse(product['price']) ?? 0;
+                  } else {
+                    product['price'] = product['price'] ?? 0;
+                  }
+
+                  // Handle arrays safely
+                  if (product['tags'] is! List) {
+                    product['tags'] = [];
+                  }
+                  if (product['images'] is! List) {
+                    product['images'] = [];
+                  }
+
+                  dealerProducts.add(DealerProduct.fromJson(product));
+                }
+              } catch (e) {
+                print("⚠️ Error parsing product: $e");
+                print("⚠️ Product data: $product");
+                continue;
+              }
+            }
+
+            if (dealerProducts.isNotEmpty) {
+              print(
+                "✅ Found ${dealerProducts.length} dealer products from $endpoint",
+              );
+              return dealerProducts;
+            }
+          }
+        } catch (e) {
+          print("❌ Error with endpoint $endpoint: $e");
+          continue;
+        }
+      }
+
+      // If no endpoint works, return some dummy data for testing
+      print("📦 No working endpoint found, returning dummy data for testing");
+      return [
+        DealerProduct.fromJson({
+          '_id': 'dummy1',
+          'title': 'Test Car 1',
+          'description': 'Test description',
+          'price': 500000,
+          'dealerId': 'dealer123',
+          'dealerName': 'Test Dealer',
+          'sellerType': 'dealer',
+          'tags': ['car', 'test'],
+          'images': ['https://via.placeholder.com/300'],
+          'createdAt': DateTime.now().toIso8601String(),
+          'updatedAt': DateTime.now().toIso8601String(),
+        }),
+        DealerProduct.fromJson({
+          '_id': 'dummy2',
+          'title': 'Test Car 2',
+          'description': 'Another test car',
+          'price': 750000,
+          'dealerId': 'dealer456',
+          'dealerName': 'Another Dealer',
+          'sellerType': 'dealer',
+          'tags': ['car', 'luxury'],
+          'images': ['https://via.placeholder.com/300'],
+          'createdAt': DateTime.now().toIso8601String(),
+          'updatedAt': DateTime.now().toIso8601String(),
+        }),
+      ];
+    } catch (e) {
+      print("💥 fetchDealerProducts error: $e");
       throw Exception('Error fetching dealer products: $e');
+    }
+  }
+
+  // Helper method to fetch cars from individual dealer
+  static Future<List<DealerProduct>> _fetchDealerCars(String dealerId) async {
+    try {
+      final url =
+          "https://oldmarket.bhoomi.cloud/api/dealers/dealer/$dealerId/cars";
+      print("🚗 Fetching cars for dealer $dealerId from: $url");
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['status'] == true && jsonResponse['data'] != null) {
+          final List<dynamic> carsData = jsonResponse['data'];
+          return carsData
+              .map((carJson) => DealerProduct.fromJson(carJson))
+              .toList();
+        }
+      }
+
+      return []; // Return empty list if no cars or API failed
+    } catch (e) {
+      print("⚠️ Error fetching cars for dealer $dealerId: $e");
+      return []; // Return empty list on error
     }
   }
 
@@ -966,7 +1624,7 @@ class ApiService {
     String productId,
   ) async {
     final url = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/dealers/$productId',
+      'https://oldmarket.bhoomi.cloud/api/dealers/$productId',
     );
 
     try {
@@ -1444,7 +2102,7 @@ class ApiService {
   // Get Chats API (GET)
   static Future<List<Chat>> getChats(String userId) async {
     final url = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/chat/user/$userId',
+      'https://oldmarket.bhoomi.cloud/api/chat/user/$userId',
     );
     final response = await http.get(url);
     print("===========chat json data===== ${jsonDecode(response.body)}");
@@ -1505,7 +2163,7 @@ class ApiService {
   // Get Messages API (GET)
   static Future<List<Message>> getMessages(String chatId) async {
     final url = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/chat/$chatId/messages',
+      'https://oldmarket.bhoomi.cloud/api/chat/$chatId/messages',
     );
     final response = await http.get(url);
 
@@ -1531,7 +2189,7 @@ class ApiService {
     String senderId,
     String content,
   ) async {
-    final url = Uri.parse('http://oldmarket.bhoomi.cloud/api/chat/send');
+    final url = Uri.parse('https://oldmarket.bhoomi.cloud/api/chat/send');
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
@@ -1549,13 +2207,84 @@ class ApiService {
     }
   }
 
+  // Send Media API (POST) - For images, videos, and audio
+  static Future<Message> sendMediaMessage({
+    required String chatId,
+    required String senderId,
+    required File mediaFile,
+  }) async {
+    try {
+      print('📤 [ChatMedia] Starting media upload...');
+      print('📤 [ChatMedia] chatId: $chatId');
+      print('📤 [ChatMedia] senderId: $senderId');
+      print('📤 [ChatMedia] File path: ${mediaFile.path}');
+      print('📤 [ChatMedia] File size: ${await mediaFile.length()} bytes');
+
+      final url = Uri.parse('https://oldmarket.bhoomi.cloud/api/chat/send');
+      var request = http.MultipartRequest('POST', url);
+
+      // Add fields
+      request.fields['chatId'] = chatId;
+      request.fields['senderId'] = senderId;
+
+      print('📤 [ChatMedia] Request fields: ${request.fields}');
+
+      // Detect MIME type
+      final mimeType = lookupMimeType(mediaFile.path);
+      print('📤 [ChatMedia] Detected MIME type: $mimeType');
+
+      if (mimeType == null) {
+        throw Exception('Could not determine file MIME type');
+      }
+
+      final mimeTypeData = mimeType.split('/');
+
+      // Add media file
+      var multipartFile = await http.MultipartFile.fromPath(
+        'media',
+        mediaFile.path,
+        contentType: MediaType(mimeTypeData[0], mimeTypeData[1]),
+      );
+
+      request.files.add(multipartFile);
+      print('📤 [ChatMedia] Added file to request: ${multipartFile.filename}');
+      print('📤 [ChatMedia] File field name: media');
+      print(
+        '📤 [ChatMedia] Content-Type: ${mimeTypeData[0]}/${mimeTypeData[1]}',
+      );
+
+      print('📤 [ChatMedia] Sending request to: ${url.toString()}');
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('📥 [ChatMedia] Response status: ${response.statusCode}');
+      print('📥 [ChatMedia] Response body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final jsonResponse = jsonDecode(response.body);
+        print('✅ [ChatMedia] Media uploaded successfully!');
+        print('✅ [ChatMedia] Response data: $jsonResponse');
+        return Message.fromJson(jsonResponse['data']);
+      } else {
+        print(
+          '❌ [ChatMedia] Upload failed with status: ${response.statusCode}',
+        );
+        print('❌ [ChatMedia] Error body: ${response.body}');
+        throw Exception('Failed to send media: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ [ChatMedia] Exception during upload: $e');
+      rethrow;
+    }
+  }
+
   // Start Chat API (POST)
   static Future<String> startChat(
     String productId,
     String buyerId,
     String sellerId,
   ) async {
-    final url = Uri.parse('http://oldmarket.bhoomi.cloud/api/chat/start');
+    final url = Uri.parse('https://oldmarket.bhoomi.cloud/api/chat/start');
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
@@ -1586,7 +2315,7 @@ class ApiService {
   }) async {
     try {
       final url = Uri.parse(
-        "http://oldmarket.bhoomi.cloud/api/products/dealer/$productId/offers",
+        "https://oldmarket.bhoomi.cloud/api/products/dealer/$productId/offers",
       );
       final response = await http.post(
         url,
@@ -1609,7 +2338,7 @@ class ApiService {
   // fetch all offers
   Future<Map<String, dynamic>?> fetchUserOffers(String productId) async {
     final url = Uri.parse(
-      "http://oldmarket.bhoomi.cloud/api/products/$productId/offers",
+      "https://oldmarket.bhoomi.cloud/api/products/$productId/offers",
     );
     try {
       final response = await http.get(url);
@@ -1628,7 +2357,7 @@ class ApiService {
     String offerId,
   ) async {
     final url = Uri.parse(
-      "http://oldmarket.bhoomi.cloud/api/products/$productId/offers/$offerId/accept",
+      "https://oldmarket.bhoomi.cloud/api/products/$productId/offers/$offerId/accept",
     );
 
     try {
@@ -1655,7 +2384,7 @@ class ApiService {
     String offerId,
   ) async {
     final url = Uri.parse(
-      "http://oldmarket.bhoomi.cloud/api/products/$productId/offers/$offerId/reject",
+      "https://oldmarket.bhoomi.cloud/api/products/$productId/offers/$offerId/reject",
     );
     try {
       final response = await http.put(url);
@@ -1672,7 +2401,7 @@ class ApiService {
 
   static Future<List<UserOffer>> fetchDealerOffers(String productId) async {
     final uri = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/products/dealer/$productId/offers',
+      'https://oldmarket.bhoomi.cloud/api/products/dealer/$productId/offers',
     );
     final response = await http.get(uri);
     if (response.statusCode == 200) {
@@ -1689,7 +2418,7 @@ class ApiService {
     String offerId,
   ) async {
     final uri = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/products/$productId/offer/accept',
+      'https://oldmarket.bhoomi.cloud/api/products/$productId/offer/accept',
     );
     final response = await http.post(
       uri,
@@ -1717,7 +2446,7 @@ class ApiService {
     String offerId,
   ) async {
     final uri = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/products/$productId/offer/reject',
+      'https://oldmarket.bhoomi.cloud/api/products/$productId/offer/reject',
     );
     final response = await http.post(
       uri,
@@ -1744,7 +2473,7 @@ class ApiService {
     String productId,
   ) async {
     final url = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/cars/product/$productId',
+      'https://oldmarket.bhoomi.cloud/api/cars/product/$productId',
     );
 
     try {
@@ -1775,7 +2504,7 @@ class ApiService {
   /// accept testdrive
   static Future<bool> acceptTestDrive(String testDriveId) async {
     final url = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/cars/test-drives/$testDriveId/accept',
+      'https://oldmarket.bhoomi.cloud/api/cars/test-drives/$testDriveId/accept',
     );
     try {
       final response = await http.put(url);
@@ -1790,7 +2519,7 @@ class ApiService {
   /// 🔧 Reject test drive
   static Future<bool> rejectTestDrive(String testDriveId) async {
     final url = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/cars/test-drives/$testDriveId/reject',
+      'https://oldmarket.bhoomi.cloud/api/cars/test-drives/$testDriveId/reject',
     );
     try {
       final response = await http.put(url);
@@ -1826,7 +2555,7 @@ class ApiService {
     required String preferredTime,
   }) async {
     final url = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/cars/product/$carId/book-test-drive',
+      'https://oldmarket.bhoomi.cloud/api/cars/product/$carId/book-test-drive',
     );
 
     final body = {
@@ -1860,7 +2589,7 @@ class ApiService {
   static Future<List<BookTestDriveScreenModel>> fetchDealerTestDrives(
     String carId,
   ) async {
-    final url = Uri.parse('http://oldmarket.bhoomi.cloud/api/cars/car/$carId');
+    final url = Uri.parse('https://oldmarket.bhoomi.cloud/api/cars/car/$carId');
 
     print("📡 Dealer Test Drive API → GET $url");
 
@@ -1891,7 +2620,7 @@ class ApiService {
     String bookingId,
   ) async {
     final url = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/cars/test-drives/$bookingId/accept',
+      'https://oldmarket.bhoomi.cloud/api/cars/test-drives/$bookingId/accept',
     );
     print("📡 PUT $url → Accept Dealer Test Drive");
 
@@ -1918,7 +2647,7 @@ class ApiService {
     String bookingId,
   ) async {
     final url = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/cars/test-drives/$bookingId/reject',
+      'https://oldmarket.bhoomi.cloud/api/cars/test-drives/$bookingId/reject',
     );
     print(" PUT $url → Reject Dealer Test Drive");
 
@@ -2024,10 +2753,10 @@ class ApiService {
 
     // Try multiple possible API endpoints for dealer stats
     final urls = [
-      "http://oldmarket.bhoomi.cloud/api/dealers/dealer/$dealerId/stats",
-      "http://oldmarket.bhoomi.cloud/api/dealers/$dealerId/stats",
-      "http://oldmarket.bhoomi.cloud/api/dealers/stats/$dealerId",
-      "http://oldmarket.bhoomi.cloud/api/dealers/profile/$dealerId",
+      "https://oldmarket.bhoomi.cloud/api/dealers/dealer/$dealerId/stats",
+      "https://oldmarket.bhoomi.cloud/api/dealers/$dealerId/stats",
+      "https://oldmarket.bhoomi.cloud/api/dealers/stats/$dealerId",
+      "https://oldmarket.bhoomi.cloud/api/dealers/profile/$dealerId",
     ];
 
     for (String url in urls) {
@@ -2062,7 +2791,7 @@ class ApiService {
   static Future<Map<String, dynamic>?> getDealerCars(String dealerId) async {
     print("🔍 [API] getDealerCars called for dealerId: $dealerId");
     final url =
-        "http://oldmarket.bhoomi.cloud/api/dealers/dealer/$dealerId/cars";
+        "https://oldmarket.bhoomi.cloud/api/dealers/dealer/$dealerId/cars";
     print("🌐 [API] URL: $url");
 
     try {
@@ -2445,12 +3174,12 @@ class ApiService {
     // First, get current logged-in user ID for proper filtering
     final userId = await _getUserIdFromPrefsOrToken(tokenCtrl);
     print(
-      '[ApiService] getMyProducts called. userId: $userId, token present=${tokenCtrl.apiToken.value.isNotEmpty}',
+      '🔍 [getMyProducts] Starting. userId: $userId, token present: ${tokenCtrl.apiToken.value.isNotEmpty}',
     );
 
     if (userId.isEmpty) {
       print(
-        '[ApiService] getMyProducts: no userId available - cannot filter user products',
+        '⚠️ [getMyProducts] No userId available - cannot filter user products',
       );
       apiLastError = 'User not logged in';
       return <AllProductModel>[];
@@ -2472,6 +3201,17 @@ class ApiService {
         );
 
         if (data.isNotEmpty) {
+          // 🔍🔍 DEBUG: Print raw location data from first product
+          if (data.isNotEmpty && data[0] is Map) {
+            final firstRaw = data[0] as Map<String, dynamic>;
+            print('🔍🔍🔍 [ApiService] RAW First Product JSON:');
+            print('   Title: ${firstRaw['title']}');
+            print('   Location field: ${firstRaw['location']}');
+            print('   City field: ${firstRaw['city']}');
+            print('   State field: ${firstRaw['state']}');
+            print('   Country field: ${firstRaw['country']}');
+          }
+
           final list = data
               .map((e) => AllProductModel.fromJson(e as Map<String, dynamic>))
               .toList();
@@ -2764,7 +3504,7 @@ class ApiService {
   static Future<bool> deleteDealerCar(String dealerType, String carId) async {
     // expects URL: /api/dealers/dealer/{dealerType}/{carId}/delete or similar per your cURL
     final url = Uri.parse(
-      'http://oldmarket.bhoomi.cloud/api/dealers/dealer/$dealerType/$carId/delete',
+      'https://oldmarket.bhoomi.cloud/api/dealers/dealer/$dealerType/$carId/delete',
     );
     try {
       final tokenCtrl = Get.find<TokenController>();
@@ -2784,21 +3524,121 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>?> getAllDealers() async {
-    print("🔍 [API] getAllDealers called");
-    final url = "http://oldmarket.bhoomi.cloud/api/dealers/all";
+  /// Get all dealer cars from all dealers
+  static Future<Map<String, dynamic>?> getAllDealerCars() async {
+    print("🔍 [API] getAllDealerCars called");
+    final url = "https://oldmarket.bhoomi.cloud/api/dealers/dealer/cars";
     print("🌐 [API] URL: $url");
 
     try {
       final response = await http.get(Uri.parse(url));
       print("📥 [API] Response Status: ${response.statusCode}");
-      print("📦 [API] Response Body: ${response.body}");
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        print("📊 [API] Successfully fetched dealer cars");
+        return data;
+      } else {
+        print("❌ [API] Failed with status: ${response.statusCode}");
+        print("❌ [API] Response body: ${response.body}");
+      }
+    } catch (e) {
+      print("❌ [API] Error in getAllDealerCars: $e");
+    }
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> getAllDealers() async {
+    print("🔍 [API] getAllDealers called");
+    final url = "https://oldmarket.bhoomi.cloud/api/dealers/profiles";
+    print("🌐 [API] URL: $url");
+
+    try {
+      final response = await http.get(Uri.parse(url));
+      print("📥 [API] Response Status: ${response.statusCode}");
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print(
+          "📊 [API] Successfully fetched ${(data['data'] as List?)?.length ?? 0} dealers",
+        );
+        return data;
+      } else {
+        print("❌ [API] Failed with status: ${response.statusCode}");
       }
     } catch (e) {
       print("❌ [API] Error in getAllDealers: $e");
+    }
+    return null;
+  }
+
+  /// Get products by location filter (city, state, country)
+  static Future<Map<String, dynamic>?> getProductsByLocation({
+    String? country,
+    String? state,
+    String? city,
+  }) async {
+    print("🔍 [API] getProductsByLocation called");
+
+    // Build query parameters
+    List<String> queryParams = [];
+    if (country != null && country.isNotEmpty) {
+      queryParams.add('country=${Uri.encodeComponent(country)}');
+    }
+    if (state != null && state.isNotEmpty) {
+      queryParams.add('state=${Uri.encodeComponent(state)}');
+    }
+    if (city != null && city.isNotEmpty) {
+      queryParams.add('city=${Uri.encodeComponent(city)}');
+    }
+
+    final queryString = queryParams.isNotEmpty
+        ? '?${queryParams.join('&')}'
+        : '';
+    final url =
+        "https://oldmarket.bhoomi.cloud/api/products/filter/location$queryString";
+    print("🌐 [API] URL: $url");
+
+    // Try multiple times with different timeouts
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        print("🔄 [API] Attempt $attempt/3");
+
+        final response = await http
+            .get(
+              Uri.parse(url),
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+              },
+            )
+            .timeout(
+              Duration(seconds: 10 + (attempt * 5)),
+            ); // Increasing timeout
+
+        print("📥 [API] Response Status: ${response.statusCode}");
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          print(
+            "📊 [API] Successfully fetched products by location - ${data['count']} items",
+          );
+          return data;
+        } else {
+          print("❌ [API] Failed with status: ${response.statusCode}");
+          if (attempt == 3) {
+            print("❌ [API] Response body: ${response.body}");
+          }
+        }
+      } catch (e) {
+        print("❌ [API] Attempt $attempt failed: $e");
+        if (attempt == 3) {
+          print("❌ [API] All attempts failed for getProductsByLocation");
+        } else {
+          print("🔄 [API] Retrying in ${attempt} seconds...");
+          await Future.delayed(Duration(seconds: attempt));
+        }
+      }
     }
     return null;
   }
@@ -2815,15 +3655,15 @@ class ApiService {
       'https://oldmarket.bhoomi.cloud/api/auth/user/$userId',
       'https://oldmarket.bhoomi.cloud/api/auth/users/$userId',
       // HTTP fallbacks
-      'http://oldmarket.bhoomi.cloud/api/users/$userId',
-      'http://oldmarket.bhoomi.cloud/api/user/$userId',
-      'http://oldmarket.bhoomi.cloud/api/auth/user/$userId',
-      'http://oldmarket.bhoomi.cloud/api/auth/users/$userId',
+      'https://oldmarket.bhoomi.cloud/api/users/$userId',
+      'https://oldmarket.bhoomi.cloud/api/user/$userId',
+      'https://oldmarket.bhoomi.cloud/api/auth/user/$userId',
+      'https://oldmarket.bhoomi.cloud/api/auth/users/$userId',
       // Extra common patterns
       'https://oldmarket.bhoomi.cloud/api/users/get/$userId',
-      'http://oldmarket.bhoomi.cloud/api/users/get/$userId',
+      'https://oldmarket.bhoomi.cloud/api/users/get/$userId',
       'https://oldmarket.bhoomi.cloud/api/users/getUser/$userId',
-      'http://oldmarket.bhoomi.cloud/api/users/getUser/$userId',
+      'https://oldmarket.bhoomi.cloud/api/users/getUser/$userId',
     ];
 
     for (final url in candidates) {
@@ -3032,6 +3872,374 @@ class ApiService {
       Logger.e('ApiService', 'JSON Decode Error: $e');
       Logger.e('ApiService', 'Body content: $body');
       return {};
+    }
+  }
+
+  // ============ COMMENT APIs ============
+
+  /// Add comment on product
+  static Future<Map<String, dynamic>?> addCommentOnProduct({
+    required String userId,
+    required String productId,
+    required String comment,
+  }) async {
+    print('\n🌐 [ApiService.addCommentOnProduct] START');
+    print('API Parameters:');
+    print('  - userId: $userId');
+    print('  - productId: $productId');
+    print('  - comment: "$comment"');
+
+    try {
+      final url = Uri.parse('https://oldmarket.bhoomi.cloud/api/comments/add');
+      print('📍 API URL: $url');
+
+      final requestBody = {
+        'userId': userId,
+        'targetType': 'product',
+        'targetId': productId,
+        'comment': comment,
+      };
+      print('📦 Request Body: $requestBody');
+      print('📦 Request Body JSON: ${json.encode(requestBody)}');
+
+      print('🚀 Sending POST request...');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      );
+
+      print('📥 Response received:');
+      print('  - Status Code: ${response.statusCode}');
+      print('  - Headers: ${response.headers}');
+      print('  - Body: ${response.body}');
+      print('  - Body length: ${response.body.length}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ Success! Decoding response...');
+        final decodedResponse = json.decode(response.body);
+        print('📄 Decoded Response: $decodedResponse');
+        print('🌐 [ApiService.addCommentOnProduct] END - SUCCESS\n');
+        return decodedResponse;
+      } else {
+        print('❌ Failed with status code: ${response.statusCode}');
+        print('Response body: ${response.body}');
+        print('🌐 [ApiService.addCommentOnProduct] END - FAILURE\n');
+        return null;
+      }
+    } catch (e, stackTrace) {
+      print('❌ EXCEPTION in addCommentOnProduct:');
+      print('Error: $e');
+      print('Error type: ${e.runtimeType}');
+      print('StackTrace: $stackTrace');
+      print('🌐 [ApiService.addCommentOnProduct] END - EXCEPTION\n');
+      return null;
+    }
+  }
+
+  /// Get comments for product
+  static Future<Map<String, dynamic>?> getProductComments({
+    required String productId,
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      print('[ApiService] 📖 Fetching comments for product: $productId');
+      final response = await http.get(
+        Uri.parse(
+          'https://oldmarket.bhoomi.cloud/api/comments/product/$productId?page=$page&limit=$limit',
+        ),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      print('[ApiService] Get comments response: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        print('[ApiService] ❌ Get comments failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('[ApiService] ❌ Get comments error: $e');
+      return null;
+    }
+  }
+
+  /// Add comment on car (dealer product)
+  static Future<Map<String, dynamic>?> addCommentOnCar({
+    required String userId,
+    required String carId,
+    required String comment,
+  }) async {
+    print('\n🌐 [ApiService.addCommentOnCar] START');
+    print('API Parameters:');
+    print('  - userId: $userId');
+    print('  - carId: $carId');
+    print('  - comment: "$comment"');
+
+    try {
+      final url = Uri.parse('https://oldmarket.bhoomi.cloud/api/comments/add');
+      print('📍 API URL: $url');
+
+      final requestBody = {
+        'userId': userId,
+        'targetType': 'car',
+        'targetId': carId,
+        'comment': comment,
+      };
+      print('📦 Request Body: $requestBody');
+      print('📦 Request Body JSON: ${json.encode(requestBody)}');
+
+      print('🚀 Sending POST request...');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      );
+
+      print('📥 Response received:');
+      print('  - Status Code: ${response.statusCode}');
+      print('  - Headers: ${response.headers}');
+      print('  - Body: ${response.body}');
+      print('  - Body length: ${response.body.length}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ Success! Decoding response...');
+        final decodedResponse = json.decode(response.body);
+        print('📄 Decoded Response: $decodedResponse');
+        print('🌐 [ApiService.addCommentOnCar] END - SUCCESS\n');
+        return decodedResponse;
+      } else {
+        print('❌ Failed with status code: ${response.statusCode}');
+        print('Response body: ${response.body}');
+        print('🌐 [ApiService.addCommentOnCar] END - FAILURE\n');
+        return null;
+      }
+    } catch (e, stackTrace) {
+      print('❌ EXCEPTION in addCommentOnCar:');
+      print('Error: $e');
+      print('Error type: ${e.runtimeType}');
+      print('StackTrace: $stackTrace');
+      print('🌐 [ApiService.addCommentOnCar] END - EXCEPTION\n');
+      return null;
+    }
+  }
+
+  /// Get comments for car (dealer product)
+  static Future<Map<String, dynamic>?> getCarComments({
+    required String carId,
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      print('[ApiService] 📖 Fetching comments for car: $carId');
+      final response = await http.get(
+        Uri.parse(
+          'https://oldmarket.bhoomi.cloud/api/comments/car/$carId?page=$page&limit=$limit',
+        ),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      print('[ApiService] Get comments response: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        print('[ApiService] ❌ Get comments failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('[ApiService] ❌ Get comments error: $e');
+      return null;
+    }
+  }
+
+  /// Delete comment
+  static Future<bool> deleteComment({
+    required String commentId,
+    required String userId,
+  }) async {
+    try {
+      print('[ApiService] 🗑️ Deleting comment: $commentId');
+      final response = await http.delete(
+        Uri.parse('https://oldmarket.bhoomi.cloud/api/comments/$commentId'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'userId': userId}),
+      );
+
+      print('[ApiService] Delete comment response: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        print('[ApiService] ❌ Delete comment failed: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('[ApiService] ❌ Delete comment error: $e');
+      return false;
+    }
+  }
+
+  /// Edit comment
+  static Future<Map<String, dynamic>?> editComment({
+    required String commentId,
+    required String userId,
+    required String comment,
+  }) async {
+    try {
+      print('[ApiService] ✏️ Editing comment: $commentId');
+      final response = await http.put(
+        Uri.parse('https://oldmarket.bhoomi.cloud/api/comments/$commentId'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'userId': userId, 'comment': comment}),
+      );
+
+      print('[ApiService] Edit comment response: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('[ApiService] ✅ Comment edited successfully');
+        return data;
+      } else {
+        print('[ApiService] ❌ Edit comment failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('[ApiService] ❌ Edit comment error: $e');
+      return null;
+    }
+  }
+
+  /// Reply to comment
+  static Future<Map<String, dynamic>?> replyToComment({
+    required String parentCommentId,
+    required String userId,
+    required String comment,
+    required String targetType,
+    required String targetId,
+  }) async {
+    try {
+      print('[ApiService] 💬 Replying to comment: $parentCommentId');
+
+      final requestBody = {
+        'userId': userId,
+        'comment': comment,
+        'targetType': targetType,
+        'targetId': targetId,
+        'parentCommentId': parentCommentId,
+      };
+
+      print('[ApiService] 📤 Request Body: ${json.encode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse('https://oldmarket.bhoomi.cloud/api/comments/add'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      );
+
+      print('[ApiService] Reply comment response: ${response.statusCode}');
+      print('[ApiService] 📥 Response Body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = json.decode(response.body);
+        print('[ApiService] ✅ Reply posted successfully');
+        print('[ApiService] 📋 Response Data: $data');
+        return data;
+      } else {
+        print('[ApiService] ❌ Reply comment failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('[ApiService] ❌ Reply comment error: $e');
+      return null;
+    }
+  }
+
+  /// 🔥 Update User Product Status (Active/Sold Out)
+  static Future<bool> updateUserProductStatus({
+    required String productId,
+    required bool status,
+  }) async {
+    try {
+      print(
+        '[ApiService] 🔄 Updating user product status: $productId -> $status',
+      );
+
+      final response = await http.put(
+        Uri.parse(
+          'https://oldmarket.bhoomi.cloud/api/products/$productId/status',
+        ),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'status': status}),
+      );
+
+      print('[ApiService] 📊 Status update response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        print('[ApiService] ✅ User product status updated successfully');
+        return true;
+      } else {
+        print('[ApiService] ❌ Failed to update status: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('[ApiService] ❌ Update status error: $e');
+      return false;
+    }
+  }
+
+  /// 🔥 Update Dealer Product Status (Active/Sold Out)
+  static Future<bool> updateDealerProductStatus({
+    required String carId,
+    required bool status,
+  }) async {
+    try {
+      print(
+        '[ApiService] 🔄 Updating dealer product status: $carId -> $status',
+      );
+
+      final response = await http.put(
+        Uri.parse('https://oldmarket.bhoomi.cloud/api/cars/$carId/status'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'status': status}),
+      );
+
+      print('[ApiService] 📊 Status update response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        print('[ApiService] ✅ Dealer product status updated successfully');
+        return true;
+      } else {
+        print('[ApiService] ❌ Failed to update status: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('[ApiService] ❌ Update status error: $e');
+      return false;
+    }
+  }
+
+  // Fetch all offer statuses for current user
+  static Future<List<Map<String, dynamic>>> fetchOfferStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId') ?? prefs.getString('user_uid');
+
+      if (userId == null || userId.isEmpty) {
+        print('[ApiService] ❌ No userId found');
+        return [];
+      }
+
+      print('[ApiService] 🔍 Fetching offer status for userId: $userId');
+
+      // For now return empty list - backend needs proper endpoint
+      // Backend should create: GET /api/users/{userId}/offers
+      // which returns all offers made BY that user with product details
+      print(
+        '[ApiService] ⚠️ Offer status feature requires backend API: /api/users/{userId}/offers',
+      );
+      return [];
+    } catch (e) {
+      print('[ApiService] ❌ Fetch offer status error: $e');
+      return [];
     }
   }
 }

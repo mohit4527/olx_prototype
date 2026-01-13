@@ -14,9 +14,7 @@ class MakeOfferController extends GetxController {
   }) {
     Get.dialog(
       Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
           width: double.infinity,
           padding: EdgeInsets.all(AppSizer().height2),
@@ -76,7 +74,10 @@ class MakeOfferController extends GetxController {
                 children: [
                   // Cancel Button
                   TextButton(
-                    onPressed: () => Get.back(),
+                    onPressed: () {
+                      offerController.clear();
+                      Navigator.of(Get.overlayContext!).pop();
+                    },
                     child: Text(
                       "Cancel",
                       style: TextStyle(
@@ -97,8 +98,12 @@ class MakeOfferController extends GetxController {
                     ),
                     onPressed: () async {
                       if (offerController.text.trim().isEmpty) {
-                        Get.snackbar("Error", "Please enter a valid price",
-                            backgroundColor: Colors.red, colorText: Colors.white);
+                        Get.snackbar(
+                          "Error",
+                          "Please enter a valid price",
+                          backgroundColor: Colors.red,
+                          colorText: Colors.white,
+                        );
                         return;
                       }
                       final requestBody = {
@@ -107,7 +112,6 @@ class MakeOfferController extends GetxController {
                         "sellerId": sellerId,
                         "offerPrice": int.parse(offerController.text),
                       };
-
 
                       print("📩 Make Offer Request Body: $requestBody");
 
@@ -118,17 +122,29 @@ class MakeOfferController extends GetxController {
                       );
                       print("Make Offer API Response: ${response?.message}");
                       print("Make Offer API Status: ${response?.status}");
-                      Get.back();
-                      Future.delayed(const Duration(milliseconds: 300), () {
-                        if (response != null && response.status) {
-                          offerController.clear();
-                          Get.snackbar("Success", response.message ?? "Offer posted successfully",
-                              backgroundColor: Colors.green, colorText: Colors.white);
-                        } else {
-                          Get.snackbar("Failed", response?.message ?? "Offer failed",
-                              backgroundColor: Colors.red, colorText: Colors.white);
-                        }
-                      });
+
+                      // Close dialog after API response
+                      if (Get.isDialogOpen ?? false) {
+                        Navigator.of(Get.overlayContext!).pop();
+                      }
+                      offerController.clear();
+
+                      // Show success/error message
+                      if (response != null && response.status) {
+                        Get.snackbar(
+                          "Success",
+                          response.message ?? "Offer posted successfully",
+                          backgroundColor: Colors.green,
+                          colorText: Colors.white,
+                        );
+                      } else {
+                        Get.snackbar(
+                          "Failed",
+                          response?.message ?? "Offer failed",
+                          backgroundColor: Colors.red,
+                          colorText: Colors.white,
+                        );
+                      }
                     },
                     child: const Text(
                       "Post Offer",
@@ -141,7 +157,7 @@ class MakeOfferController extends GetxController {
           ),
         ),
       ),
-      barrierDismissible: false,
+      barrierDismissible: true,
     );
   }
 }

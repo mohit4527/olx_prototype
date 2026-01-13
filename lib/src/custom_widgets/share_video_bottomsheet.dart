@@ -17,7 +17,7 @@ class ShareVideoBottomSheet extends StatelessWidget {
   String getFull(String path) {
     final fixed = path.replaceAll("\\", "/");
     if (fixed.startsWith("http")) return fixed;
-    final base = "http://oldmarket.bhoomi.cloud/";
+    final base = "https://oldmarket.bhoomi.cloud/";
     final rel = fixed.startsWith("/") ? fixed.substring(1) : fixed;
     return "$base$rel";
   }
@@ -164,7 +164,7 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
   String _getFull(String path) {
     final fixed = path.replaceAll("\\", "/");
     if (fixed.startsWith("http")) return fixed;
-    final base = "http://oldmarket.bhoomi.cloud/";
+    final base = "https://oldmarket.bhoomi.cloud/";
     final rel = fixed.startsWith("/") ? fixed.substring(1) : fixed;
     return "$base$rel";
   }

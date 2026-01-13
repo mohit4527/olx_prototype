@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
 import '../model/chat_model/chat_model.dart';
 import 'package:intl/intl.dart';
+import '../view/home/chat_details/video_player_screen.dart';
 
 /// Helper function to format the time since the last message
 String formatTimeAgo(DateTime dateTime) {
@@ -122,21 +123,184 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool sentByMe = message.senderId == currentUserId;
+    final messageType = message.messageType ?? 'text';
+    final isMedia = messageType == 'image' || messageType == 'video';
 
     return Align(
       alignment: sentByMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
+        padding: isMedia ? const EdgeInsets.all(4) : const EdgeInsets.all(12),
         margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: sentByMe ? const Color(0xFF075E54) : Colors.black,
           borderRadius: BorderRadius.circular(15),
         ),
-        child: Text(
+        child: _buildMessageContent(context, messageType),
+      ),
+    );
+  }
+
+  Widget _buildMessageContent(BuildContext context, String messageType) {
+    switch (messageType) {
+      case 'image':
+        return _buildImageMessage(context);
+      case 'video':
+        return _buildVideoMessage(context);
+      default:
+        return Text(
           message.content,
           style: const TextStyle(color: Colors.white),
+        );
+    }
+  }
+
+  Widget _buildImageMessage(BuildContext context) {
+    if (message.mediaUrl == null || message.mediaUrl!.isEmpty) {
+      return const Text('Image', style: TextStyle(color: Colors.white70));
+    }
+
+    // Build full URL
+    final String baseUrl = 'https://oldmarket.bhoomi.cloud';
+    final String imageUrl = message.mediaUrl!.startsWith('http')
+        ? message.mediaUrl!
+        : '$baseUrl${message.mediaUrl}';
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: GestureDetector(
+        onTap: () => _showFullScreenImage(context, imageUrl),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 200,
+            maxHeight: 200,
+            minWidth: 150,
+            minHeight: 150,
+          ),
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                width: 180,
+                height: 180,
+                color: Colors.grey.shade800,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                        : null,
+                    color: Colors.white,
+                  ),
+                ),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                width: 180,
+                height: 180,
+                color: Colors.grey.shade800,
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.broken_image, color: Colors.white54, size: 40),
+                    SizedBox(height: 8),
+                    Text(
+                      'Failed to load image',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildVideoMessage(BuildContext context) {
+    if (message.mediaUrl == null || message.mediaUrl!.isEmpty) {
+      return const Text('Video', style: TextStyle(color: Colors.white70));
+    }
+
+    // Build full URL
+    final String baseUrl = 'https://oldmarket.bhoomi.cloud';
+    final String videoUrl = message.mediaUrl!.startsWith('http')
+        ? message.mediaUrl!
+        : '$baseUrl${message.mediaUrl}';
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: GestureDetector(
+        onTap: () => _playVideo(context, videoUrl),
+        child: Container(
+          width: 180,
+          height: 180,
+          color: Colors.grey.shade800,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              const Icon(
+                Icons.play_circle_outline,
+                size: 50,
+                color: Colors.white,
+              ),
+              Positioned(
+                bottom: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.videocam, color: Colors.white, size: 16),
+                      SizedBox(width: 4),
+                      Text(
+                        'Video',
+                        style: TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFullScreenImage(BuildContext context, String imageUrl) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            iconTheme: const IconThemeData(color: Colors.white),
+          ),
+          body: Center(
+            child: InteractiveViewer(child: Image.network(imageUrl)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _playVideo(BuildContext context, String videoUrl) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => VideoPlayerScreen(videoUrl: videoUrl)),
     );
   }
 }

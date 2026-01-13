@@ -97,6 +97,47 @@ class SellDealerCarScreen extends StatelessWidget {
 
                 SizedBox(height: AppSizer().height1),
 
+                /// 🔹 Tags
+                _buildLabel("Tags (comma separated)"),
+                TextField(
+                  controller: controller.tagsController,
+                  decoration: _inputDecoration(
+                    "e.g. Certified, Low KM, Like New",
+                  ),
+                ),
+
+                SizedBox(height: AppSizer().height2),
+
+                /// 🔹 Country field
+                _buildLabel("Country *"),
+                TextField(
+                  controller: controller.countryController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _inputDecoration("Enter country (e.g., India)"),
+                ),
+
+                SizedBox(height: AppSizer().height1),
+
+                /// 🔹 State field
+                _buildLabel("State *"),
+                TextField(
+                  controller: controller.stateController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _inputDecoration("Enter state (e.g., Delhi)"),
+                ),
+
+                SizedBox(height: AppSizer().height1),
+
+                /// 🔹 City field
+                _buildLabel("City *"),
+                TextField(
+                  controller: controller.cityController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _inputDecoration("Enter city (e.g., New Delhi)"),
+                ),
+
+                SizedBox(height: AppSizer().height2),
+
                 /// 🔹 Description
                 _buildLabel("Description"),
                 TextField(

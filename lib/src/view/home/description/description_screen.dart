@@ -6,6 +6,7 @@ import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
 import 'package:olx_prototype/src/controller/chat_controller.dart';
 import 'package:olx_prototype/src/controller/description_controller.dart';
+import 'package:olx_prototype/src/utils/app_routes.dart';
 // ...existing imports...
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -13,12 +14,17 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import '../../../controller/all_products_controller.dart';
 import '../../../controller/book_test_drive_controller.dart';
 import '../../../controller/user_make_offer_controller.dart';
 import '../../../controller/user_wishlist_controller.dart';
+import '../../../controller/product_boost_controller.dart';
+import '../../../controller/token_controller.dart';
+import '../../../controller/comment_controller.dart';
 import '../../../custom_widgets/desription_screen_card.dart';
+import '../../../custom_widgets/comment_section_widget.dart';
 import '../../../services/phone_resolver_service.dart';
 
 // ...existing imports...
@@ -48,6 +54,9 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
   late final MakeOfferController makeOfferController;
   late final ProductController productcontroller;
   late final BookTestDriveController bookTestDriveController;
+  late final ProductBoostController boostController;
+  late final TokenController tokenController;
+  late final CommentController commentController;
   // ChatController is registered in initState; no local field required
   final PageController _pageController = PageController();
   final wishlistController = Get.put(UserWishlistController());
@@ -58,6 +67,9 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
     controller = Get.put(DescriptionController());
     makeOfferController = Get.put(MakeOfferController());
     productcontroller = Get.put(ProductController());
+    boostController = Get.put(ProductBoostController());
+    tokenController = Get.find<TokenController>();
+    commentController = Get.put(CommentController());
     bookTestDriveController = Get.put(BookTestDriveController());
     // Use Get.find if already exists, otherwise create new
     try {
@@ -239,6 +251,54 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
         duration: const Duration(seconds: 4),
       );
     }
+  }
+
+  // 📸 Full Screen Image Gallery Method
+  void _showFullScreenImages(List<String> imageUrls, int initialIndex) {
+    Get.to(
+      () => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: IconThemeData(color: Colors.white),
+          leading: IconButton(
+            icon: Icon(Icons.close, color: Colors.white, size: 30),
+            onPressed: () => Get.back(),
+          ),
+        ),
+        body: PageView.builder(
+          controller: PageController(initialPage: initialIndex),
+          itemCount: imageUrls.length,
+          itemBuilder: (context, index) {
+            final raw = imageUrls[index];
+            final imagePath = raw.replaceAll('\\', '/');
+            final url = 'https://oldmarket.bhoomi.cloud/$imagePath';
+
+            return Container(
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Center(
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Image.asset(
+                        'assets/images/placeholder.jpg',
+                        fit: BoxFit.contain,
+                      );
+                    },
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      fullscreenDialog: true,
+    );
   }
 
   // legacy helper removed — using _shareOnWhatsApp for sharing text to WhatsApp
@@ -490,7 +550,13 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
         ),
         centerTitle: true,
         leading: IconButton(
-          onPressed: () => Get.back(),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Get.back();
+            }
+          },
           icon: Icon(Icons.arrow_back, color: AppColors.appWhite),
         ),
       ),
@@ -538,30 +604,39 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
                         ),
                       );
                     }
-                    return SizedBox(
-                      height: AppSizer().height30,
-                      child: PageView.builder(
-                        controller: _pageController,
-                        itemCount: product.mediaUrl.length,
-                        itemBuilder: (context, imageIndex) {
-                          final raw = product.mediaUrl[imageIndex];
-                          final imagePath = raw.replaceAll('\\', '/');
-                          final url =
-                              'https://oldmarket.bhoomi.cloud/$imagePath';
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.network(
-                              url,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Image.asset(
-                                  'assets/images/placeholder.jpg',
+                    return GestureDetector(
+                      onTap: () => _showFullScreenImages(product.mediaUrl, 0),
+                      child: SizedBox(
+                        height: AppSizer().height30,
+                        child: PageView.builder(
+                          controller: _pageController,
+                          itemCount: product.mediaUrl.length,
+                          itemBuilder: (context, imageIndex) {
+                            final raw = product.mediaUrl[imageIndex];
+                            final imagePath = raw.replaceAll('\\', '/');
+                            final url =
+                                'https://oldmarket.bhoomi.cloud/$imagePath';
+                            return GestureDetector(
+                              onTap: () => _showFullScreenImages(
+                                product.mediaUrl,
+                                imageIndex,
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.network(
+                                  url,
                                   fit: BoxFit.cover,
-                                );
-                              },
-                            ),
-                          );
-                        },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Image.asset(
+                                      'assets/images/placeholder.jpg',
+                                      fit: BoxFit.cover,
+                                    );
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     );
                   }),
@@ -967,6 +1042,17 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
                               },
                               icon: Icon(Icons.share),
                             ),
+
+                            // Comment Icon Button
+                            IconButton(
+                              onPressed: () {
+                                _showCommentsBottomSheet(product.id);
+                              },
+                              icon: Icon(
+                                Icons.comment_outlined,
+                                color: Colors.black,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -979,54 +1065,277 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
                       if (controller.product.value == null)
                         return const SizedBox();
                       final product = controller.product.value!;
-                      return InkWell(
-                        onTap: () {
-                          makeOfferController.showMakeOfferDialog(
-                            productId: product.id,
-                            buyerId: product.userId ?? "",
-                            sellerId: '',
-                          );
-                        },
-                        child: Container(
-                          height: AppSizer().height5,
-                          width: AppSizer().width40,
-                          decoration: BoxDecoration(
-                            color: AppColors.appGreen,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.local_offer,
-                                color: AppColors.appWhite,
-                                size: 25,
+                      final currentUserId = tokenController.userUid.value;
+                      final isOwner = product.userId == currentUserId;
+                      final canBoost = isOwner && !product.isBoosted;
+                      final isSoldOut = product.status == false;
+
+                      // Hide action buttons if product is sold out
+                      if (isSoldOut) {
+                        return const SizedBox();
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () async {
+                                // Check if user is logged in
+                                if (!tokenController.isLoggedIn) {
+                                  Get.snackbar(
+                                    "Login Required",
+                                    "Please login first",
+                                    backgroundColor: AppColors.appRed,
+                                    colorText: Colors.white,
+                                    snackPosition: SnackPosition.BOTTOM,
+                                  );
+                                  Get.toNamed(AppRoutes.login);
+                                  return;
+                                }
+
+                                // Get logged-in user's ID
+                                final prefs =
+                                    await SharedPreferences.getInstance();
+                                final loggedInUserId =
+                                    prefs.getString('userId') ??
+                                    prefs.getString('user_uid') ??
+                                    '';
+
+                                makeOfferController.showMakeOfferDialog(
+                                  productId: product.id,
+                                  buyerId: loggedInUserId,
+                                  sellerId: product.userId ?? "",
+                                );
+                              },
+                              child: Container(
+                                height: AppSizer().height5,
+                                decoration: BoxDecoration(
+                                  color: AppColors.appGreen,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.local_offer,
+                                      color: AppColors.appWhite,
+                                      size: 22,
+                                    ),
+                                    SizedBox(width: AppSizer().width2),
+                                    Text(
+                                      "Make Offer",
+                                      style: TextStyle(
+                                        color: AppColors.appWhite,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              SizedBox(width: AppSizer().width3),
-                              Text(
-                                "Make Offer",
-                                style: TextStyle(color: AppColors.appWhite),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
+                          if (canBoost) ...[
+                            SizedBox(width: AppSizer().width2),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  // Check if user is logged in
+                                  if (!tokenController.isLoggedIn) {
+                                    Get.snackbar(
+                                      "Login Required",
+                                      "Please login first",
+                                      backgroundColor: AppColors.appRed,
+                                      colorText: Colors.white,
+                                      snackPosition: SnackPosition.BOTTOM,
+                                    );
+                                    Get.toNamed(AppRoutes.login);
+                                    return;
+                                  }
+
+                                  boostController.startBoostPayment(product.id);
+                                },
+                                child: Container(
+                                  height: AppSizer().height5,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.orange.shade600,
+                                        Colors.deepOrange,
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.rocket_launch,
+                                        color: Colors.white,
+                                        size: 22,
+                                      ),
+                                      SizedBox(width: AppSizer().width2),
+                                      Text(
+                                        "Boost",
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       );
                     }),
                   ],
 
                   SizedBox(height: AppSizer().height1),
 
-                  // Title
+                  // Title with Boosted Badge and Sold Out Badge
                   Obx(() {
                     if (controller.product.value == null)
                       return const SizedBox();
                     final product = controller.product.value!;
-                    return Text(
-                      product.title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: AppSizer().fontSize17,
-                      ),
+                    final isSoldOut = product.status == false;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: AppSizer().fontSize17,
+                          ),
+                        ),
+                        SizedBox(height: AppSizer().height1),
+
+                        // Sold Out Badge (if product is sold out)
+                        if (isSoldOut) ...[
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.red.withOpacity(0.4),
+                                  blurRadius: 8,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.block,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'SOLD OUT',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: AppSizer().height1),
+                          // Product Not Available Message
+                          Container(
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.red.shade300,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.red.shade700,
+                                  size: 22,
+                                ),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'This product is not available',
+                                    style: TextStyle(
+                                      color: Colors.red.shade700,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // Boosted Badge (if product is boosted and NOT sold out)
+                        if (product.isBoosted && !isSoldOut) ...[
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.orange.shade600,
+                                  Colors.deepOrange,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.orange.withOpacity(0.4),
+                                  blurRadius: 8,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.rocket_launch,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'BOOSTED',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     );
                   }),
 
@@ -1049,29 +1358,42 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
                     return Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          '${product.city}, ${product.state}, ${product.country}',
-                          style: TextStyle(
-                            color: AppColors.appGrey.shade700,
-                            fontSize: AppSizer().fontSize16,
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            '${product.city}, ${product.state}, ${product.country}',
+                            style: TextStyle(
+                              color: AppColors.appGrey.shade700,
+                              fontSize: AppSizer().fontSize16,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.alarm,
-                              color: AppColors.appGrey.shade700,
-                              size: 20,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              timeAgo,
-                              style: TextStyle(
+                        SizedBox(width: 8),
+                        Flexible(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.alarm,
                                 color: AppColors.appGrey.shade700,
-                                fontSize: AppSizer().fontSize16,
+                                size: 20,
                               ),
-                            ),
-                          ],
+                              SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  timeAgo,
+                                  style: TextStyle(
+                                    color: AppColors.appGrey.shade700,
+                                    fontSize: AppSizer().fontSize16,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     );
@@ -1109,516 +1431,628 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
                   }),
                   if (!widget.fromVideo) ...[
                     SizedBox(height: AppSizer().height2),
-                    Text(
-                      "Contact me - ",
-                      style: TextStyle(
-                        fontSize: AppSizer().fontSize17,
-                        fontWeight: FontWeight.bold,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                    SizedBox(height: AppSizer().height4),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: () async {
-                              print(
-                                '[Call] 🔥 CALL BUTTON PRESSED - Starting process...',
-                              );
+                    Obx(() {
+                      if (controller.product.value == null)
+                        return const SizedBox();
+                      final product = controller.product.value!;
+                      final isSoldOut = product.status == false;
 
-                              // Check if call functionality is available
-                              try {
-                                final testUri = Uri.parse('tel:+919999999999');
-                                final canCall = await canLaunchUrl(testUri);
-                                print(
-                                  '[Call] Device can launch tel: URLs: $canCall',
-                                );
-                              } catch (e) {
-                                print(
-                                  '[Call] Call capability check failed: $e',
-                                );
-                              }
+                      // Hide contact section if product is sold out
+                      if (isSoldOut) {
+                        return const SizedBox();
+                      }
 
-                              // Show loading
-                              Get.snackbar(
-                                '📞 Getting Phone Number...',
-                                'Please wait while we fetch contact details',
-                              );
-
-                              await controller.ensureUploaderContact();
-
-                              // Prefer uploader phone resolved by controller, else fallback
-                              String phoneNumber =
-                                  controller.uploaderPhone.value.isNotEmpty
-                                  ? controller.uploaderPhone.value
-                                  : (controller.product.value?.phoneNumber ??
-                                        controller.product.value?.whatsapp ??
-                                        "");
-
-                              // 🔥 Enhanced debug logging
-                              print(
-                                '[Call] ========== CALL DEBUG INFO ==========',
-                              );
-                              print(
-                                '[Call] Product ID: ${controller.product.value?.id}',
-                              );
-                              print(
-                                '[Call] Product userId: ${controller.product.value?.userId}',
-                              );
-                              print(
-                                '[Call] Product phoneNumber: ${controller.product.value?.phoneNumber}',
-                              );
-                              print(
-                                '[Call] Product whatsapp: ${controller.product.value?.whatsapp}',
-                              );
-                              print(
-                                '[Call] Controller uploaderPhone: ${controller.uploaderPhone.value}',
-                              );
-                              print(
-                                '[Call] Controller uploaderWhatsApp: ${controller.uploaderWhatsApp.value}',
-                              );
-                              print(
-                                '[Call] Initial phone to call: "$phoneNumber"',
-                              );
-
-                              // 🔥 EMERGENCY FALLBACK: If still no phone, try direct resolution
-                              if (phoneNumber.isEmpty &&
-                                  controller.product.value?.userId != null) {
-                                print(
-                                  '[Call] 🚨 EMERGENCY: No phone found, trying PhoneResolverService...',
-                                );
-                                Get.snackbar(
-                                  '🔍 Searching...',
-                                  'Trying alternative methods to find contact',
-                                );
-
-                                final emergencyPhone =
-                                    await PhoneResolverService.resolvePhoneForUser(
-                                      controller.product.value!.userId!,
-                                    );
-
-                                if (emergencyPhone != null &&
-                                    emergencyPhone.isNotEmpty) {
-                                  phoneNumber = emergencyPhone;
-                                  print(
-                                    '[Call] 🎉 EMERGENCY SUCCESS: Found phone: $phoneNumber',
-                                  );
-                                  Get.snackbar(
-                                    '✅ Found!',
-                                    'Contact number retrieved successfully',
-                                  );
-                                } else {
-                                  print(
-                                    '[Call] 💥 EMERGENCY FAILED: Still no phone found',
-                                  );
-                                }
-                              }
-
-                              print(
-                                '[Call] Final phone to call: "$phoneNumber"',
-                              );
-                              print(
-                                '[Call] ====================================',
-                              );
-
-                              if (phoneNumber.isEmpty ||
-                                  phoneNumber == "null") {
-                                Get.snackbar(
-                                  '❌ No Phone Number',
-                                  'Contact number not available for this product.\nTry contacting through WhatsApp instead.',
-                                  duration: Duration(seconds: 4),
-                                );
-                                return;
-                              }
-
-                              await _openDialer(phoneNumber);
-                            },
-                            child: Container(
-                              height: AppSizer().height5,
-                              decoration: BoxDecoration(
-                                color: AppColors.appGreen,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    "Call",
-                                    style: TextStyle(color: AppColors.appWhite),
-                                  ),
-                                  SizedBox(width: AppSizer().width3),
-                                  Icon(Icons.phone, color: AppColors.appWhite),
-                                ],
-                              ),
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Contact me - ",
+                            style: TextStyle(
+                              fontSize: AppSizer().fontSize17,
+                              fontWeight: FontWeight.bold,
+                              fontStyle: FontStyle.italic,
                             ),
                           ),
-                        ),
+                          SizedBox(height: AppSizer().height4),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () async {
+                                    // Check if user is logged in
+                                    if (!tokenController.isLoggedIn) {
+                                      Get.snackbar(
+                                        "Login Required",
+                                        "Please login first",
+                                        backgroundColor: AppColors.appRed,
+                                        colorText: Colors.white,
+                                        snackPosition: SnackPosition.BOTTOM,
+                                      );
+                                      Get.toNamed(AppRoutes.login);
+                                      return;
+                                    }
 
-                        SizedBox(width: AppSizer().width3),
-
-                        // WhatsApp - Direct messaging to seller
-                        Expanded(
-                          child: InkWell(
-                            onTap: () async {
-                              print(
-                                '[WhatsApp] � Direct seller messaging started...',
-                              );
-
-                              // Show loading
-                              Get.snackbar(
-                                '� Opening WhatsApp',
-                                'Connecting to seller for direct messaging...',
-                                backgroundColor: Colors.green,
-                                colorText: Colors.white,
-                                duration: const Duration(seconds: 2),
-                              );
-
-                              await controller.ensureUploaderContact();
-
-                              // Get seller's phone number (same as call button)
-                              String phoneNumber =
-                                  controller.uploaderPhone.value.isNotEmpty
-                                  ? controller.uploaderPhone.value
-                                  : (controller.product.value?.phoneNumber ??
-                                        controller.product.value?.whatsapp ??
-                                        "");
-
-                              print('[WhatsApp] 📞 Seller phone: $phoneNumber');
-
-                              // Emergency fallback
-                              if (phoneNumber.isEmpty &&
-                                  controller.product.value?.userId != null) {
-                                final emergencyPhone =
-                                    await PhoneResolverService.resolvePhoneForUser(
-                                      controller.product.value!.userId!,
+                                    print(
+                                      '[Call] 🔥 CALL BUTTON PRESSED - Starting process...',
                                     );
 
-                                if (emergencyPhone != null &&
-                                    emergencyPhone.isNotEmpty) {
-                                  phoneNumber = emergencyPhone;
-                                  print(
-                                    '[WhatsApp] ✅ Emergency contact found: $phoneNumber',
-                                  );
-                                }
-                              }
+                                    // Check if call functionality is available
+                                    try {
+                                      final testUri = Uri.parse(
+                                        'tel:+919999999999',
+                                      );
+                                      final canCall = await canLaunchUrl(
+                                        testUri,
+                                      );
+                                      print(
+                                        '[Call] Device can launch tel: URLs: $canCall',
+                                      );
+                                    } catch (e) {
+                                      print(
+                                        '[Call] Call capability check failed: $e',
+                                      );
+                                    }
 
-                              final prod = controller.product.value;
+                                    // Show loading
+                                    Get.snackbar(
+                                      '📞 Getting Phone Number...',
+                                      'Please wait while we fetch contact details',
+                                    );
 
-                              // Create direct messaging text (buyer to seller)
-                              String message =
-                                  "Hi! 👋 I'm interested in your product:\n\n";
-                              message += "🛍️ *${prod?.title ?? 'Product'}*\n";
-                              if (prod?.price != null) {
-                                message += "💰 Price: ₹${prod!.price}\n";
-                              }
-                              message +=
-                                  "\nIs this still available? I'd like to know more details.\n";
-                              message += "Thank you! 😊";
+                                    await controller.ensureUploaderContact();
 
-                              // Direct WhatsApp chat with seller
-                              if (phoneNumber.isNotEmpty &&
-                                  phoneNumber != "null") {
-                                print(
-                                  '[WhatsApp] 🎯 Opening direct chat with seller: $phoneNumber',
-                                );
-                                await _openWhatsAppChat(phoneNumber, message);
-                              } else {
-                                print(
-                                  '[WhatsApp] ❌ No seller contact available',
-                                );
-                                Get.snackbar(
-                                  '❌ No Contact Available',
-                                  'Seller contact information not available for direct messaging.',
-                                  backgroundColor: Colors.red,
-                                  colorText: Colors.white,
-                                  duration: Duration(seconds: 4),
-                                );
-                              }
-                            },
-                            child: Container(
-                              height: AppSizer().height5,
-                              decoration: BoxDecoration(
-                                color: AppColors.appGreen,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    "WhatsApp Chat",
-                                    style: TextStyle(color: AppColors.appWhite),
+                                    // Prefer uploader phone resolved by controller, else fallback
+                                    String phoneNumber =
+                                        controller
+                                            .uploaderPhone
+                                            .value
+                                            .isNotEmpty
+                                        ? controller.uploaderPhone.value
+                                        : (controller
+                                                  .product
+                                                  .value
+                                                  ?.phoneNumber ??
+                                              controller
+                                                  .product
+                                                  .value
+                                                  ?.whatsapp ??
+                                              "");
+
+                                    // 🔥 Enhanced debug logging
+                                    print(
+                                      '[Call] ========== CALL DEBUG INFO ==========',
+                                    );
+                                    print(
+                                      '[Call] Product ID: ${controller.product.value?.id}',
+                                    );
+                                    print(
+                                      '[Call] Product userId: ${controller.product.value?.userId}',
+                                    );
+                                    print(
+                                      '[Call] Product phoneNumber: ${controller.product.value?.phoneNumber}',
+                                    );
+                                    print(
+                                      '[Call] Product whatsapp: ${controller.product.value?.whatsapp}',
+                                    );
+                                    print(
+                                      '[Call] Controller uploaderPhone: ${controller.uploaderPhone.value}',
+                                    );
+                                    print(
+                                      '[Call] Controller uploaderWhatsApp: ${controller.uploaderWhatsApp.value}',
+                                    );
+                                    print(
+                                      '[Call] Initial phone to call: "$phoneNumber"',
+                                    );
+
+                                    // 🔥 EMERGENCY FALLBACK: If still no phone, try direct resolution
+                                    if (phoneNumber.isEmpty &&
+                                        controller.product.value?.userId !=
+                                            null) {
+                                      print(
+                                        '[Call] 🚨 EMERGENCY: No phone found, trying PhoneResolverService...',
+                                      );
+                                      Get.snackbar(
+                                        '🔍 Searching...',
+                                        'Trying alternative methods to find contact',
+                                      );
+
+                                      final emergencyPhone =
+                                          await PhoneResolverService.resolvePhoneForUser(
+                                            controller.product.value!.userId!,
+                                          );
+
+                                      if (emergencyPhone != null &&
+                                          emergencyPhone.isNotEmpty) {
+                                        phoneNumber = emergencyPhone;
+                                        print(
+                                          '[Call] 🎉 EMERGENCY SUCCESS: Found phone: $phoneNumber',
+                                        );
+                                        Get.snackbar(
+                                          '✅ Found!',
+                                          'Contact number retrieved successfully',
+                                        );
+                                      } else {
+                                        print(
+                                          '[Call] 💥 EMERGENCY FAILED: Still no phone found',
+                                        );
+                                      }
+                                    }
+
+                                    print(
+                                      '[Call] Final phone to call: "$phoneNumber"',
+                                    );
+                                    print(
+                                      '[Call] ====================================',
+                                    );
+
+                                    if (phoneNumber.isEmpty ||
+                                        phoneNumber == "null") {
+                                      Get.snackbar(
+                                        '❌ No Phone Number',
+                                        'Contact number not available for this product.\nTry contacting through WhatsApp instead.',
+                                        duration: Duration(seconds: 4),
+                                      );
+                                      return;
+                                    }
+
+                                    await _openDialer(phoneNumber);
+                                  },
+                                  child: Container(
+                                    height: AppSizer().height5,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.appGreen,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          "Call",
+                                          style: TextStyle(
+                                            color: AppColors.appWhite,
+                                          ),
+                                        ),
+                                        SizedBox(width: AppSizer().width3),
+                                        Icon(
+                                          Icons.phone,
+                                          color: AppColors.appWhite,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  SizedBox(width: AppSizer().width3),
-                                  Icon(
-                                    FontAwesomeIcons.whatsapp,
-                                    color: AppColors.appWhite,
-                                    size: 25,
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
+
+                              SizedBox(width: AppSizer().width3),
+
+                              // WhatsApp - Direct messaging to seller
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () async {
+                                    // Check if user is logged in
+                                    if (!tokenController.isLoggedIn) {
+                                      Get.snackbar(
+                                        "Login Required",
+                                        "Please login first",
+                                        backgroundColor: AppColors.appRed,
+                                        colorText: Colors.white,
+                                        snackPosition: SnackPosition.BOTTOM,
+                                      );
+                                      Get.toNamed(AppRoutes.login);
+                                      return;
+                                    }
+
+                                    print(
+                                      '[WhatsApp] � Direct seller messaging started...',
+                                    );
+
+                                    // Show loading
+                                    Get.snackbar(
+                                      '� Opening WhatsApp',
+                                      'Connecting to seller for direct messaging...',
+                                      backgroundColor: Colors.green,
+                                      colorText: Colors.white,
+                                      duration: const Duration(seconds: 2),
+                                    );
+
+                                    await controller.ensureUploaderContact();
+
+                                    // Get seller's phone number (same as call button)
+                                    String phoneNumber =
+                                        controller
+                                            .uploaderPhone
+                                            .value
+                                            .isNotEmpty
+                                        ? controller.uploaderPhone.value
+                                        : (controller
+                                                  .product
+                                                  .value
+                                                  ?.phoneNumber ??
+                                              controller
+                                                  .product
+                                                  .value
+                                                  ?.whatsapp ??
+                                              "");
+
+                                    print(
+                                      '[WhatsApp] 📞 Seller phone: $phoneNumber',
+                                    );
+
+                                    // Emergency fallback
+                                    if (phoneNumber.isEmpty &&
+                                        controller.product.value?.userId !=
+                                            null) {
+                                      final emergencyPhone =
+                                          await PhoneResolverService.resolvePhoneForUser(
+                                            controller.product.value!.userId!,
+                                          );
+
+                                      if (emergencyPhone != null &&
+                                          emergencyPhone.isNotEmpty) {
+                                        phoneNumber = emergencyPhone;
+                                        print(
+                                          '[WhatsApp] ✅ Emergency contact found: $phoneNumber',
+                                        );
+                                      }
+                                    }
+
+                                    final prod = controller.product.value;
+
+                                    // Create direct messaging text (buyer to seller)
+                                    String message =
+                                        "Hi! 👋 I'm interested in your product:\n\n";
+                                    message +=
+                                        "🛍️ *${prod?.title ?? 'Product'}*\n";
+                                    if (prod?.price != null) {
+                                      message += "💰 Price: ₹${prod!.price}\n";
+                                    }
+                                    message +=
+                                        "\nIs this still available? I'd like to know more details.\n";
+                                    message += "Thank you! 😊";
+
+                                    // Direct WhatsApp chat with seller
+                                    if (phoneNumber.isNotEmpty &&
+                                        phoneNumber != "null") {
+                                      print(
+                                        '[WhatsApp] 🎯 Opening direct chat with seller: $phoneNumber',
+                                      );
+                                      await _openWhatsAppChat(
+                                        phoneNumber,
+                                        message,
+                                      );
+                                    } else {
+                                      print(
+                                        '[WhatsApp] ❌ No seller contact available',
+                                      );
+                                      Get.snackbar(
+                                        '❌ No Contact Available',
+                                        'Seller contact information not available for direct messaging.',
+                                        backgroundColor: Colors.red,
+                                        colorText: Colors.white,
+                                        duration: Duration(seconds: 4),
+                                      );
+                                    }
+                                  },
+                                  child: Container(
+                                    height: AppSizer().height5,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.appGreen,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          "WhatsApp Chat",
+                                          style: TextStyle(
+                                            color: AppColors.appWhite,
+                                          ),
+                                        ),
+                                        SizedBox(width: AppSizer().width3),
+                                        Icon(
+                                          FontAwesomeIcons.whatsapp,
+                                          color: AppColors.appWhite,
+                                          size: 25,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      );
+                    }),
                   ],
                   SizedBox(height: AppSizer().height2),
                   // Book test drive bottom sheet
-                  InkWell(
-                    onTap: () {
-                      Get.bottomSheet(
-                        Padding(
-                          padding: EdgeInsets.only(
-                            bottom: MediaQuery.of(context).viewInsets.bottom,
-                          ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: AppColors.appGradient,
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
+                  Obx(() {
+                    if (controller.product.value == null)
+                      return const SizedBox();
+                    final product = controller.product.value!;
+                    final isSoldOut = product.status == false;
+
+                    // Hide book test drive if product is sold out
+                    if (isSoldOut) {
+                      return const SizedBox();
+                    }
+
+                    return InkWell(
+                      onTap: () {
+                        // Check if user is logged in
+                        if (!tokenController.isLoggedIn) {
+                          Get.snackbar(
+                            "Login Required",
+                            "Please login first",
+                            backgroundColor: AppColors.appRed,
+                            colorText: Colors.white,
+                            snackPosition: SnackPosition.BOTTOM,
+                          );
+                          Get.toNamed(AppRoutes.login);
+                          return;
+                        }
+
+                        Get.bottomSheet(
+                          Padding(
+                            padding: EdgeInsets.only(
+                              bottom: MediaQuery.of(context).viewInsets.bottom,
+                            ),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: AppColors.appGradient,
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(20),
+                                ),
                               ),
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(20),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 24,
+                              ),
+                              child: GetBuilder<BookTestDriveController>(
+                                builder: (bookController) {
+                                  return SingleChildScrollView(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Center(
+                                          child: Text(
+                                            "Book Test Drive",
+                                            style: TextStyle(
+                                              fontSize: AppSizer().fontSize18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(height: AppSizer().height2),
+
+                                        // Name
+                                        TextFormField(
+                                          controller:
+                                              bookController.nameController,
+                                          decoration: InputDecoration(
+                                            prefixIcon: Icon(
+                                              Icons.person,
+                                              color: AppColors.appGreen,
+                                            ),
+                                            labelText: "Your Name",
+                                            filled: true,
+                                            fillColor: Colors.white,
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(height: 16),
+
+                                        // Phone
+                                        TextFormField(
+                                          controller:
+                                              bookController.phoneController,
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter
+                                                .digitsOnly,
+                                            LengthLimitingTextInputFormatter(
+                                              10,
+                                            ),
+                                          ],
+                                          decoration: InputDecoration(
+                                            prefixIcon: Icon(
+                                              Icons.phone_android,
+                                              color: AppColors.appGreen,
+                                            ),
+                                            labelText: "Phone Number",
+                                            filled: true,
+                                            fillColor: Colors.white,
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(height: 16),
+
+                                        // Date
+                                        InkWell(
+                                          onTap: () =>
+                                              bookController.pickDate(context),
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(
+                                              vertical: 14,
+                                              horizontal: 12,
+                                            ),
+                                            width: double.infinity,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              border: Border.all(
+                                                color: Colors.grey,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.calendar_month,
+                                                  color: AppColors.appGreen,
+                                                ),
+                                                SizedBox(
+                                                  width: AppSizer().width2,
+                                                ),
+                                                Text(
+                                                  bookController.selectedDate !=
+                                                          null
+                                                      ? bookController
+                                                            .formattedDate
+                                                      : "Select Date",
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(height: 16),
+
+                                        // Time
+                                        InkWell(
+                                          onTap: () =>
+                                              bookController.pickTime(context),
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(
+                                              vertical: 14,
+                                              horizontal: 12,
+                                            ),
+                                            width: double.infinity,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              border: Border.all(
+                                                color: Colors.grey,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.alarm,
+                                                  color: AppColors.appGreen,
+                                                ),
+                                                SizedBox(
+                                                  width: AppSizer().width2,
+                                                ),
+                                                Text(
+                                                  bookController.selectedTime !=
+                                                          null
+                                                      ? bookController
+                                                            .selectedTime!
+                                                            .format(context)
+                                                      : "Select Time",
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(height: AppSizer().height3),
+
+                                        // Submit
+                                        Obx(
+                                          () => ElevatedButton.icon(
+                                            onPressed:
+                                                bookController.isLoading.value
+                                                ? null
+                                                : () {
+                                                    final productId =
+                                                        controller
+                                                            .product
+                                                            .value
+                                                            ?.id ??
+                                                        "";
+                                                    bookController
+                                                        .bookTestDrive(
+                                                          productId,
+                                                        );
+                                                  },
+                                            icon: bookController.isLoading.value
+                                                ? const SizedBox(
+                                                    width: 20,
+                                                    height: 20,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          color: Colors.white,
+                                                          strokeWidth: 2,
+                                                        ),
+                                                  )
+                                                : const Icon(
+                                                    Icons.check_circle,
+                                                  ),
+                                            label: const Text("Book Now"),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  AppColors.appGreen,
+                                              foregroundColor: Colors.white,
+                                              minimumSize: const Size(
+                                                double.infinity,
+                                                48,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(height: 24),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
                             ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 24,
-                            ),
-                            child: GetBuilder<BookTestDriveController>(
-                              builder: (bookController) {
-                                return SingleChildScrollView(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Center(
-                                        child: Text(
-                                          "Book Test Drive",
-                                          style: TextStyle(
-                                            fontSize: AppSizer().fontSize18,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(height: AppSizer().height2),
-
-                                      // Name
-                                      TextFormField(
-                                        controller:
-                                            bookController.nameController,
-                                        decoration: InputDecoration(
-                                          prefixIcon: Icon(
-                                            Icons.person,
-                                            color: AppColors.appGreen,
-                                          ),
-                                          labelText: "Your Name",
-                                          filled: true,
-                                          fillColor: Colors.white,
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(height: 16),
-
-                                      // Phone
-                                      TextFormField(
-                                        controller:
-                                            bookController.phoneController,
-                                        keyboardType: TextInputType.number,
-                                        inputFormatters: [
-                                          FilteringTextInputFormatter
-                                              .digitsOnly,
-                                          LengthLimitingTextInputFormatter(10),
-                                        ],
-                                        decoration: InputDecoration(
-                                          prefixIcon: Icon(
-                                            Icons.phone_android,
-                                            color: AppColors.appGreen,
-                                          ),
-                                          labelText: "Phone Number",
-                                          filled: true,
-                                          fillColor: Colors.white,
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(height: 16),
-
-                                      // Date
-                                      InkWell(
-                                        onTap: () =>
-                                            bookController.pickDate(context),
-                                        child: Container(
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: 14,
-                                            horizontal: 12,
-                                          ),
-                                          width: double.infinity,
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            border: Border.all(
-                                              color: Colors.grey,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.calendar_month,
-                                                color: AppColors.appGreen,
-                                              ),
-                                              SizedBox(
-                                                width: AppSizer().width2,
-                                              ),
-                                              Text(
-                                                bookController.selectedDate !=
-                                                        null
-                                                    ? bookController
-                                                          .formattedDate
-                                                    : "Select Date",
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(height: 16),
-
-                                      // Time
-                                      InkWell(
-                                        onTap: () =>
-                                            bookController.pickTime(context),
-                                        child: Container(
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: 14,
-                                            horizontal: 12,
-                                          ),
-                                          width: double.infinity,
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            border: Border.all(
-                                              color: Colors.grey,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.alarm,
-                                                color: AppColors.appGreen,
-                                              ),
-                                              SizedBox(
-                                                width: AppSizer().width2,
-                                              ),
-                                              Text(
-                                                bookController.selectedTime !=
-                                                        null
-                                                    ? bookController
-                                                          .selectedTime!
-                                                          .format(context)
-                                                    : "Select Time",
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(height: AppSizer().height3),
-
-                                      // Submit
-                                      Obx(
-                                        () => ElevatedButton.icon(
-                                          onPressed:
-                                              bookController.isLoading.value
-                                              ? null
-                                              : () {
-                                                  final productId =
-                                                      controller
-                                                          .product
-                                                          .value
-                                                          ?.id ??
-                                                      "";
-                                                  bookController.bookTestDrive(
-                                                    productId,
-                                                  );
-                                                },
-                                          icon: bookController.isLoading.value
-                                              ? const SizedBox(
-                                                  width: 20,
-                                                  height: 20,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        color: Colors.white,
-                                                        strokeWidth: 2,
-                                                      ),
-                                                )
-                                              : const Icon(Icons.check_circle),
-                                          label: const Text("Book Now"),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.appGreen,
-                                            foregroundColor: Colors.white,
-                                            minimumSize: const Size(
-                                              double.infinity,
-                                              48,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(height: 24),
-                                    ],
-                                  ),
-                                );
-                              },
+                          ),
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(20),
                             ),
                           ),
+                        );
+                      },
+                      child: Container(
+                        height: AppSizer().height6,
+                        decoration: BoxDecoration(
+                          color: AppColors.appGreen,
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(20),
-                          ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Book for Test Drive",
+                              style: TextStyle(color: AppColors.appWhite),
+                            ),
+                            SizedBox(width: AppSizer().width3),
+                            Icon(
+                              Icons.directions_car,
+                              color: AppColors.appWhite,
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                    child: Container(
-                      height: AppSizer().height6,
-                      decoration: BoxDecoration(
-                        color: AppColors.appGreen,
-                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            "Book for Test Drive",
-                            style: TextStyle(color: AppColors.appWhite),
-                          ),
-                          SizedBox(width: AppSizer().width3),
-                          Icon(Icons.directions_car, color: AppColors.appWhite),
-                        ],
-                      ),
-                    ),
-                  ),
+                    );
+                  }),
                   SizedBox(height: AppSizer().height2),
                   Obx(() {
                     final product = controller.product.value;
@@ -1626,6 +2060,12 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
 
                     final prodUserId = product.userId ?? '';
                     final curUserId = controller.currentUserId.value;
+                    final isSoldOut = product.status == false;
+
+                    // Hide Send Message button if product is sold out
+                    if (isSoldOut) {
+                      return const SizedBox();
+                    }
 
                     // If we have the logged-in user id and it's equal to the product owner,
                     // hide the Send Message button (owner shouldn't message themselves).
@@ -1637,6 +2077,19 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
 
                     return InkWell(
                       onTap: () {
+                        // Check if user is logged in
+                        if (!tokenController.isLoggedIn) {
+                          Get.snackbar(
+                            "Login Required",
+                            "Please login first",
+                            backgroundColor: AppColors.appRed,
+                            colorText: Colors.white,
+                            snackPosition: SnackPosition.BOTTOM,
+                          );
+                          Get.toNamed(AppRoutes.login);
+                          return;
+                        }
+
                         if (!isEnabled) {
                           Get.snackbar(
                             "Error",
@@ -1683,7 +2136,7 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
                     );
                   }),
 
-                  SizedBox(height: AppSizer().height2),
+                  SizedBox(height: AppSizer().height3),
                   Text(
                     "More Products...",
                     style: TextStyle(
@@ -1931,6 +2384,89 @@ class _DescriptionScreenState extends State<DescriptionScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  // Show Comments Bottom Sheet
+  void _showCommentsBottomSheet(String productId) {
+    Get.bottomSheet(
+      DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Container(
+                  margin: EdgeInsets.symmetric(vertical: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+
+                // Title
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppSizer().height2,
+                    vertical: AppSizer().height1,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.comment, color: AppColors.appGreen),
+                      SizedBox(width: 8),
+                      Text(
+                        'Comments',
+                        style: TextStyle(
+                          fontSize: AppSizer().fontSize18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Spacer(),
+                      IconButton(
+                        icon: Icon(Icons.close),
+                        onPressed: () => Get.back(),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Divider(height: 1),
+
+                // Comment Section
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    child: CommentSection(
+                      targetId: productId,
+                      isProduct: true,
+                      commentController: commentController,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+      isDismissible: true,
+      enableDrag: true,
+      isScrollControlled: true,
     );
   }
 }

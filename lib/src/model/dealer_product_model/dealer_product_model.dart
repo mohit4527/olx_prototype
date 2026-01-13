@@ -48,6 +48,7 @@ class Data {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final int? v;
+  final bool isBoosted;
 
   Data({
     this.id,
@@ -66,6 +67,7 @@ class Data {
     this.createdAt,
     this.updatedAt,
     this.v,
+    this.isBoosted = false,
   });
 
   factory Data.fromJson(Map<String, dynamic> json) => Data(
@@ -97,6 +99,7 @@ class Data {
         ? null
         : DateTime.parse(json["updatedAt"]),
     v: json["__v"],
+    isBoosted: json["isBoosted"] ?? false,
   );
 
   /// Enhanced phone extraction with comprehensive fallback hierarchy
@@ -143,5 +146,6 @@ class Data {
     "createdAt": createdAt?.toIso8601String(),
     "updatedAt": updatedAt?.toIso8601String(),
     "__v": v,
+    "isBoosted": isBoosted,
   };
 }

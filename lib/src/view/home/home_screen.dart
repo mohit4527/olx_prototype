@@ -16,6 +16,7 @@ import 'package:olx_prototype/src/utils/logger.dart';
 import 'package:olx_prototype/src/view/home/ads/ads_screen.dart';
 import 'package:olx_prototype/src/view/home/notifications/notification_screen.dart';
 import 'package:olx_prototype/src/view/home/shortVideo/shortVideo_screen.dart';
+import '../../widgets/filter_section.dart';
 import '../../controller/challan_controller.dart';
 import '../../controller/dealer_details_controller.dart';
 import '../../controller/login_controller.dart';
@@ -31,6 +32,7 @@ import '../../controller/navigation_controller.dart';
 import '../../controller/short_video_controller.dart';
 import '../../controller/token_controller.dart';
 import '../../controller/user_wishlist_controller.dart';
+import '../../controller/location_controller.dart';
 import '../../custom_widgets/cards.dart';
 import '../../custom_widgets/shortVideoWidget.dart';
 // We'll render lightweight thumbnails for most cards and only create a
@@ -53,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final shortVideoController = Get.put(ShortVideoController());
   final ScrollController _suggestedScrollController = ScrollController();
   int _activePreviewIndex = 0;
-  
+
   // 🔥 Add GlobalKey for Scaffold to control drawer
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final UserWishlistController wishlistController = Get.put(
@@ -79,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Initialize controllers safely
     _initializeControllers();
-    
+
     // 🔥 Check if we need to open drawer after navigation
     _checkDrawerArguments();
 
@@ -96,11 +98,23 @@ class _HomeScreenState extends State<HomeScreen> {
         productController.shuffleProducts();
         homeController.shuffleDealerProducts();
         shortVideoController.shuffleVideos();
+        shortVideoController
+            .fetchSuggestedVideos(); // Also shuffle suggested videos
         print('[HomeScreen] ✅ App startup shuffle completed!');
       }
     });
     // Listen to scroll events on suggested videos to activate a single preview
     _suggestedScrollController.addListener(_onSuggestedScroll);
+
+    // 🔄 Shuffle suggested videos every 30 seconds for variety
+    Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted) {
+        shortVideoController.fetchSuggestedVideos();
+        print('[HomeScreen] 🔄 Suggested videos reshuffled!');
+      } else {
+        timer.cancel();
+      }
+    });
   }
 
   void _initializeControllers() {
@@ -114,8 +128,17 @@ class _HomeScreenState extends State<HomeScreen> {
     // Initialize TokenController if not present
     try {
       tokenController = Get.find<TokenController>();
+      // ✅ Force reload business account data on app start
+      tokenController.loadTokenFromStorage();
+      print('🔍 [HomeScreen] TokenController found and reloaded');
+      print(
+        '   - Business Account: ${tokenController.isBusinessAccount.value}',
+      );
+      print('   - Business Name: ${tokenController.businessName.value}');
+      print('   - Business Role: ${tokenController.businessRole.value}');
     } catch (e) {
-      tokenController = Get.put(TokenController());
+      tokenController = Get.put(TokenController(), permanent: true);
+      print('⚠️ [HomeScreen] TokenController initialized');
     }
 
     // Initialize HomeController if not present
@@ -245,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (path.isEmpty) return '';
     final fixed = path.replaceAll('\\', '/');
     if (fixed.startsWith('http')) return fixed;
-    const baseAssets = 'http://oldmarket.bhoomi.cloud/';
+    const baseAssets = 'https://oldmarket.bhoomi.cloud/';
     final rel = fixed.startsWith('/') ? fixed.substring(1) : fixed;
     return '$baseAssets$rel';
   }
@@ -258,6 +281,11 @@ class _HomeScreenState extends State<HomeScreen> {
         'name': 'Profile',
         'icon': Icons.person,
         'onTap': () => Get.toNamed(AppRoutes.profile),
+      },
+      {
+        'name': 'Location Setting',
+        'icon': Icons.location_on,
+        'onTap': () => Get.toNamed(AppRoutes.location_settings),
       },
       {
         'name': 'History',
@@ -326,13 +354,17 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       });
     } else {
-      print(
-        '❌ [HomeScreen] Adding "Business Account" (create new) to drawer items',
-      );
+      print('❌ [HomeScreen] Adding "Create Business Account" to drawer items');
       baseItems.insert(1, {
-        'name': 'Business Account',
+        'name': 'Create Business Account',
         'icon': Icons.perm_identity,
-        'onTap': () => Get.toNamed(AppRoutes.dealer),
+        'onTap': () {
+          print(
+            '🚀 [HomeScreen] Create Business Account tapped - Opening dealer profile screen',
+          );
+          // ✅ Navigate directly to dealer profile screen (no dialog)
+          Get.toNamed(AppRoutes.dealer);
+        },
       });
     }
 
@@ -340,10 +372,15 @@ class _HomeScreenState extends State<HomeScreen> {
       'name': 'Sell',
       'icon': Icons.directions_car,
       'onTap': () {
-        // Choose route based on dealer profile existence
+        // ✅ Choose route based on dealer profile creation status
+        // If dealer profile created: go to dealer products screen
+        // If normal user: go to user post upload screen
         final route = dealerController.isProfileCreated.value
             ? AppRoutes.sell_dealer_cars
             : AppRoutes.sell_user_cars;
+        print(
+          '🚀 [HomeScreen] Sell button tapped - Route: $route (isDealer: ${dealerController.isProfileCreated.value})',
+        );
         Get.toNamed(route);
       },
     });
@@ -414,16 +451,24 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             Obx(() {
-                              // Prefer TokenController stored displayName (from signup/google), else profile controller
-                              final savedName =
-                                  tokenController.displayName.value;
-                              final username = (savedName.isNotEmpty)
-                                  ? savedName
-                                  : (getProfileController
-                                            .profileData['Username'] ??
-                                        'Guest');
+                              // Show business name if business account, otherwise username
+                              final displayName =
+                                  dealerController.isProfileCreated.value &&
+                                      dealerController
+                                          .businessNameController
+                                          .text
+                                          .isNotEmpty
+                                  ? dealerController.businessNameController.text
+                                  : (tokenController
+                                            .displayName
+                                            .value
+                                            .isNotEmpty
+                                        ? tokenController.displayName.value
+                                        : (getProfileController
+                                                  .profileData['Username'] ??
+                                              'Guest'));
                               return Text(
-                                username,
+                                displayName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -431,6 +476,41 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fontSize: AppSizer().fontSize16,
                                   fontWeight: FontWeight.w600,
                                 ),
+                              );
+                            }),
+                            // Location Display in AppBar
+                            Obx(() {
+                              final locationController = Get.put(
+                                LocationController(),
+                              );
+                              String displayLocation =
+                                  locationController.formattedLocation;
+
+                              if (displayLocation.isEmpty ||
+                                  displayLocation == 'Set Location') {
+                                return SizedBox();
+                              }
+
+                              return Row(
+                                children: [
+                                  Icon(
+                                    Icons.location_on,
+                                    size: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  SizedBox(width: 2),
+                                  Expanded(
+                                    child: Text(
+                                      displayLocation,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: AppSizer().fontSize12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               );
                             }),
                           ],
@@ -522,6 +602,18 @@ class _HomeScreenState extends State<HomeScreen> {
                               Get.toNamed(AppRoutes.profile);
                             },
                             child: Obx(() {
+                              // Show business logo if business account, otherwise user profile pic
+                              if (dealerController.isProfileCreated.value &&
+                                  dealerController.businessLogo.value != null) {
+                                return CircleAvatar(
+                                  radius: 36,
+                                  backgroundColor: const Color(0xfffae293),
+                                  backgroundImage: FileImage(
+                                    dealerController.businessLogo.value!,
+                                  ),
+                                );
+                              }
+
                               final savedPhoto = tokenController.photoUrl.value;
                               final localPath =
                                   getProfileController.imagePath.value;
@@ -640,23 +732,81 @@ class _HomeScreenState extends State<HomeScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Obx(
-                            () => Text(
-                              getProfileController.profileData['Username'] ??
-                                  '',
+                          Obx(() {
+                            // Show business name if business account, otherwise username
+                            final displayName =
+                                dealerController.isProfileCreated.value &&
+                                    dealerController
+                                        .businessNameController
+                                        .text
+                                        .isNotEmpty
+                                ? dealerController.businessNameController.text
+                                : (tokenController.displayName.value.isNotEmpty
+                                      ? tokenController.displayName.value
+                                      : (getProfileController
+                                                .profileData['Username'] ??
+                                            'User'));
+
+                            return Text(
+                              displayName,
                               style: TextStyle(
                                 fontSize: AppSizer().fontSize17,
                                 fontWeight: FontWeight.bold,
                               ),
-                            ),
-                          ),
+                            );
+                          }),
                           Obx(() {
-                            final role =
-                                getProfileController.profileData['Role'] ??
-                                'User';
+                            // ✅ Show role: Vendor for business accounts, User otherwise
+                            final role = tokenController.isBusinessAccount.value
+                                ? 'Vendor'
+                                : (dealerController.isProfileCreated.value
+                                      ? 'Dealer'
+                                      : 'User');
+
                             return Text(
                               role,
-                              style: TextStyle(color: Colors.grey.shade700),
+                              style: TextStyle(
+                                color: tokenController.isBusinessAccount.value
+                                    ? AppColors.appGreen
+                                    : Colors.grey.shade700,
+                                fontWeight:
+                                    tokenController.isBusinessAccount.value
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              ),
+                            );
+                          }),
+                          // 🔥 Location Display
+                          SizedBox(height: 4),
+                          Obx(() {
+                            final locationController = Get.put(
+                              LocationController(),
+                            );
+
+                            // Show saved location from dropdown selection
+                            final displayLocation =
+                                locationController.formattedLocation;
+
+                            if (displayLocation == 'Set Location') {
+                              return SizedBox();
+                            }
+
+                            return Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  size: 14,
+                                  color: Colors.grey.shade600,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  displayLocation,
+                                  style: TextStyle(
+                                    fontSize: AppSizer().fontSize13,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
                             );
                           }),
                         ],
@@ -672,12 +822,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   SizedBox(height: AppSizer().height1),
                   Expanded(
                     child: Obx(() {
-                      // Force reactivity by explicitly watching the dealer controller's isProfileCreated
+                      // ✅ Force reactivity by watching both dealer and business account status
                       final isProfileCreated =
                           dealerController.isProfileCreated.value;
+                      final isBusinessAccount =
+                          tokenController.isBusinessAccount.value;
+                      final businessName = tokenController.businessName.value;
+
                       print(
-                        '🔔 [HomeScreen] Drawer Obx triggered - isProfileCreated: $isProfileCreated',
+                        '🔔 [HomeScreen] Drawer Obx triggered - Dealer: $isProfileCreated, Business: $isBusinessAccount ($businessName)',
                       );
+
                       final drawerItems = getDrawerItems();
                       return ListView.builder(
                         itemCount: drawerItems.length,
@@ -786,50 +941,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       );
                     }),
-                  ),
-
-                  // 🔥 DEBUG: Manual profile check button
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                      ),
-                      onPressed: () async {
-                        print(
-                          '🔧 [DEBUG] Manual comprehensive profile check triggered',
-                        );
-
-                        // Show loading
-                        Get.snackbar(
-                          'Debug',
-                          'Checking profile state...',
-                          backgroundColor: Colors.blue,
-                          colorText: Colors.white,
-                        );
-
-                        // Force comprehensive sync
-                        await dealerController.forceSyncProfileState();
-
-                        // Update UI
-                        setState(() {});
-
-                        Get.snackbar(
-                          'Debug',
-                          'Profile check completed. isProfileCreated: ${dealerController.isProfileCreated.value}',
-                          backgroundColor: Colors.orange,
-                          colorText: Colors.white,
-                        );
-                      },
-                      child: Text(
-                        'DEBUG: Check Profile',
-                        style: TextStyle(color: Colors.white, fontSize: 12),
-                      ),
-                    ),
                   ),
                 ],
               ),
@@ -995,6 +1106,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   product.createdAt,
                                                 ),
                                                 productId: product.id,
+                                                isBoosted: product.isBoosted,
+                                                status: product.status,
                                               ),
                                             ),
                                           ),
@@ -1202,6 +1315,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   }).toList(),
                                 );
                               }),
+
                               Padding(
                                 padding: EdgeInsets.symmetric(
                                   horizontal: AppSizer().width3,
@@ -1535,6 +1649,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                         date: parseDateString(
                                           product.createdAt,
                                         ),
+                                        isBoosted: product.isBoosted,
+                                        status: product.status,
                                       ),
                                     );
                                   },
@@ -1598,7 +1714,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     // show an autoplaying, muted VideoPlayerWidget. Others
                                     // show static thumbnails to conserve resources.
                                     SizedBox(
-                                      height: AppSizer().height12 * 2.5,
+                                      height: AppSizer().height12 * 3.2,
                                       child: ListView.builder(
                                         controller: _suggestedScrollController,
                                         scrollDirection: Axis.horizontal,
@@ -1641,18 +1757,30 @@ class _HomeScreenState extends State<HomeScreen> {
                                               );
                                             },
                                             child: Container(
-                                              width: 150,
-                                              margin: const EdgeInsets.all(8),
+                                              width: 180,
+                                              margin:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 6,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 borderRadius:
-                                                    BorderRadius.circular(10),
+                                                    BorderRadius.circular(14),
                                                 color: Colors.black12,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black
+                                                        .withOpacity(0.2),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ],
                                               ),
                                               child: ClipRRect(
                                                 borderRadius:
-                                                    BorderRadius.circular(10),
+                                                    BorderRadius.circular(14),
                                                 child: SizedBox(
-                                                  width: 150,
+                                                  width: 180,
                                                   height: double.infinity,
                                                   child: thumbPath.isNotEmpty
                                                       ? VideoPlayerWidget(
@@ -1777,6 +1905,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                                     product.description,
                                                 location: product.location.city,
                                                 date: createdAt,
+                                                isBoosted: product.isBoosted,
+                                                status: product.status,
                                               ),
                                             );
                                           },
@@ -1793,24 +1923,61 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // Header
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                    // Header with See All button
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
-                                        const Text(
-                                          "Certified Dealers",
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.appGreen,
-                                          ),
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              "Top Dealers",
+                                              style: TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.appGreen,
+                                              ),
+                                            ),
+                                            Container(
+                                              margin: const EdgeInsets.only(
+                                                top: 2,
+                                              ),
+                                              height: 1.5,
+                                              width: 100,
+                                              color: AppColors.appGreen,
+                                            ),
+                                          ],
                                         ),
-                                        Container(
-                                          margin: const EdgeInsets.only(top: 2),
-                                          height: 1.5,
-                                          width: AppSizer().width90,
-                                          color: AppColors.appGreen,
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          children: [
+                                            InkWell(
+                                              onTap: () {
+                                                Get.toNamed(
+                                                  '/all_dealers_screen',
+                                                );
+                                              },
+                                              child: const Text(
+                                                'See All',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  color: AppColors.appGreen,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                            Container(
+                                              margin: const EdgeInsets.only(
+                                                top: 2,
+                                              ),
+                                              height: 1.5,
+                                              width: 50,
+                                              color: AppColors.appGreen,
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
@@ -1849,7 +2016,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         }
 
                                         const baseUrl =
-                                            "http://oldmarket.bhoomi.cloud/";
+                                            "https://oldmarket.bhoomi.cloud/";
 
                                         return CarouselSlider.builder(
                                           itemCount: dController.dealers.length,
@@ -1930,7 +2097,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   ),
                                                   child: Stack(
                                                     children: [
-                                                      // Full Width Image
+                                                      // Full Width Image with Error Handling
                                                       Container(
                                                         width: double.infinity,
                                                         height:
@@ -1943,30 +2110,90 @@ class _HomeScreenState extends State<HomeScreen> {
                                                               BorderRadius.circular(
                                                                 12,
                                                               ),
-                                                          image:
+                                                        ),
+                                                        child: ClipRRect(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                12,
+                                                              ),
+                                                          child:
                                                               imageUrl
                                                                   .isNotEmpty
-                                                              ? DecorationImage(
-                                                                  image:
-                                                                      NetworkImage(
-                                                                        imageUrl,
-                                                                      ),
+                                                              ? Image.network(
+                                                                  imageUrl,
+                                                                  width: double
+                                                                      .infinity,
+                                                                  height: AppSizer()
+                                                                      .height30,
                                                                   fit: BoxFit
                                                                       .cover,
+                                                                  errorBuilder:
+                                                                      (
+                                                                        context,
+                                                                        error,
+                                                                        stackTrace,
+                                                                      ) {
+                                                                        print(
+                                                                          '❌ Image failed to load: $imageUrl',
+                                                                        );
+                                                                        return Container(
+                                                                          width:
+                                                                              double.infinity,
+                                                                          height:
+                                                                              AppSizer().height30,
+                                                                          color: Colors
+                                                                              .grey
+                                                                              .shade200,
+                                                                          child: Center(
+                                                                            child: Icon(
+                                                                              Icons.store,
+                                                                              size: 50,
+                                                                              color: Colors.grey.shade400,
+                                                                            ),
+                                                                          ),
+                                                                        );
+                                                                      },
+                                                                  loadingBuilder:
+                                                                      (
+                                                                        context,
+                                                                        child,
+                                                                        loadingProgress,
+                                                                      ) {
+                                                                        if (loadingProgress ==
+                                                                            null)
+                                                                          return child;
+                                                                        return Container(
+                                                                          width:
+                                                                              double.infinity,
+                                                                          height:
+                                                                              AppSizer().height30,
+                                                                          color: Colors
+                                                                              .grey
+                                                                              .shade200,
+                                                                          child: Center(
+                                                                            child: CircularProgressIndicator(
+                                                                              value:
+                                                                                  loadingProgress.expectedTotalBytes !=
+                                                                                      null
+                                                                                  ? loadingProgress.cumulativeBytesLoaded /
+                                                                                        loadingProgress.expectedTotalBytes!
+                                                                                  : null,
+                                                                              color: AppColors.appGreen,
+                                                                            ),
+                                                                          ),
+                                                                        );
+                                                                      },
                                                                 )
-                                                              : null,
-                                                        ),
-                                                        child: imageUrl.isEmpty
-                                                            ? Center(
-                                                                child: Icon(
-                                                                  Icons.store,
-                                                                  size: 50,
-                                                                  color: Colors
-                                                                      .grey
-                                                                      .shade400,
+                                                              : Center(
+                                                                  child: Icon(
+                                                                    Icons.store,
+                                                                    size: 50,
+                                                                    color: Colors
+                                                                        .grey
+                                                                        .shade400,
+                                                                  ),
                                                                 ),
-                                                              )
-                                                            : null,
+                                                        ),
                                                       ),
                                                       // Black overlay container with dealer name
                                                       Positioned(
@@ -2069,57 +2296,27 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                               SizedBox(height: AppSizer().height2),
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  left: AppSizer().height1,
-                                  right: AppSizer().height1,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          "Dealer Products",
-                                          style: TextStyle(
-                                            color: AppColors.appGreen,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: AppSizer().fontSize19,
-                                          ),
-                                        ),
-                                        Container(
-                                          margin: const EdgeInsets.only(top: 0),
-                                          height: 1.5,
-                                          width: 140,
-                                          color: AppColors.appGreen,
-                                        ),
-                                      ],
-                                    ),
-                                    InkWell(
-                                      onTap: () {
-                                        // If user logged in, navigate to dealer products screen
-                                        // otherwise send to login.
-                                        if (tokenController.isLoggedIn) {
-                                          Get.toNamed(
-                                            AppRoutes.dealer_products_screen,
-                                          );
-                                        } else {
-                                          Get.toNamed(AppRoutes.login);
-                                        }
-                                      },
-                                      child: Column(
+                              // 🔐 Dealer Products Section - Only show when user is logged in
+                              if (tokenController.isLoggedIn) ...[
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    left: AppSizer().height1,
+                                    right: AppSizer().height1,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Column(
                                         crossAxisAlignment:
-                                            CrossAxisAlignment.center,
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            "View More",
+                                            "Dealer Products",
                                             style: TextStyle(
                                               color: AppColors.appGreen,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: AppSizer().fontSize18,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: AppSizer().fontSize19,
                                             ),
                                           ),
                                           Container(
@@ -2127,115 +2324,154 @@ class _HomeScreenState extends State<HomeScreen> {
                                               top: 0,
                                             ),
                                             height: 1.5,
-                                            width: 75,
+                                            width: 140,
                                             color: AppColors.appGreen,
                                           ),
                                         ],
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              SizedBox(height: AppSizer().height3),
-                              Obx(() {
-                                if (homeController.isLoadingDealer.value) {
-                                  return const Center(
-                                    child: CircularProgressIndicator(),
-                                  );
-                                }
-                                final dealerProducts =
-                                    homeController.dealerProducts;
-                                print(
-                                  "🏠 Home Screen - Dealer Products: ${dealerProducts.length} items",
-                                );
-
-                                if (dealerProducts.isEmpty) {
-                                  return Center(
-                                    child: Column(
-                                      children: [
-                                        const Text("No dealer products found"),
-                                        SizedBox(height: 8),
-                                        ElevatedButton(
-                                          onPressed: () => homeController
-                                              .fetchDealerProducts(),
-                                          child: const Text("Retry"),
+                                      InkWell(
+                                        onTap: () {
+                                          // If user logged in, navigate to dealer products screen
+                                          // otherwise send to login.
+                                          if (tokenController.isLoggedIn) {
+                                            Get.toNamed(
+                                              AppRoutes.dealer_products_screen,
+                                            );
+                                          } else {
+                                            Get.toNamed(AppRoutes.login);
+                                          }
+                                        },
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              "View More",
+                                              style: TextStyle(
+                                                color: AppColors.appGreen,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: AppSizer().fontSize18,
+                                              ),
+                                            ),
+                                            Container(
+                                              margin: const EdgeInsets.only(
+                                                top: 0,
+                                              ),
+                                              height: 1.5,
+                                              width: 75,
+                                              color: AppColors.appGreen,
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                  );
-                                }
-                                // 🎲 Use randomized dealer products for variety
-                                final limitedProducts = homeController
-                                    .getRandomDealerProducts(limit: 8);
-
-                                print(
-                                  '[HomeScreen] 🏪 Displaying ${limitedProducts.length} randomized dealer products',
-                                );
-                                return GridView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: limitedProducts.length,
-                                  padding: const EdgeInsets.all(6),
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 2,
-                                        mainAxisSpacing: 5,
-                                        crossAxisSpacing: 2,
-                                        childAspectRatio: 0.70,
                                       ),
-                                  itemBuilder: (context, index) {
-                                    final product = limitedProducts[index];
-                                    final String imageUrl =
-                                        (product.images.isNotEmpty)
-                                        ? "https://oldmarket.bhoomi.cloud/${product.images.first}"
-                                        : 'assets/images/placeholder.jpg';
-                                    final String city =
-                                        product.location ?? "Unknown";
-                                    final String title = product.title;
-                                    final String description =
-                                        product.description;
-                                    final String price = "₹ ${product.price}";
-                                    final DateTime? createdAt =
-                                        product.createdAt;
-                                    return InkWell(
-                                      onTap: () {
-                                        recentlyViewedController.addProduct(
-                                          RecentlyViewedModel(
-                                            id: product.id,
-                                            title: product.title,
-                                            image: product.images.isNotEmpty
-                                                ? product.images.first
-                                                : "",
-                                            price: product.price.toString(),
-                                            type: "dealer",
-                                            createdAt: DateTime.now(),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(height: AppSizer().height3),
+                                Obx(() {
+                                  if (homeController.isLoadingDealer.value) {
+                                    return const Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  }
+                                  final dealerProducts =
+                                      homeController.dealerProducts;
+                                  print(
+                                    "🏠 Home Screen - Dealer Products: ${dealerProducts.length} items",
+                                  );
+
+                                  if (dealerProducts.isEmpty) {
+                                    return Center(
+                                      child: Column(
+                                        children: [
+                                          const Text(
+                                            "No dealer products found",
                                           ),
-                                        );
-                                        if (tokenController.isLoggedIn) {
-                                          Get.toNamed(
-                                            AppRoutes
-                                                .dealer_product_description,
-                                            arguments: product.id,
-                                          );
-                                        } else {
-                                          Get.toNamed(AppRoutes.login);
-                                        }
-                                      },
-                                      child: ProductCard(
-                                        imagePath: imageUrl,
-                                        roomInfo: title,
-                                        price: price,
-                                        description: description,
-                                        location: city,
-                                        date: createdAt,
-                                        productId: product.id,
-                                        isDealer: true,
+                                          SizedBox(height: 8),
+                                          ElevatedButton(
+                                            onPressed: () => homeController
+                                                .fetchDealerProducts(),
+                                            child: const Text("Retry"),
+                                          ),
+                                        ],
                                       ),
                                     );
-                                  },
-                                );
-                              }),
-                              SizedBox(height: AppSizer().height2),
+                                  }
+                                  // 🎲 Use randomized dealer products for variety
+                                  final limitedProducts = homeController
+                                      .getRandomDealerProducts(limit: 8);
+
+                                  print(
+                                    '[HomeScreen] 🏪 Displaying ${limitedProducts.length} randomized dealer products',
+                                  );
+                                  return GridView.builder(
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: limitedProducts.length,
+                                    padding: const EdgeInsets.all(6),
+                                    gridDelegate:
+                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: 2,
+                                          mainAxisSpacing: 5,
+                                          crossAxisSpacing: 2,
+                                          childAspectRatio: 0.70,
+                                        ),
+                                    itemBuilder: (context, index) {
+                                      final product = limitedProducts[index];
+                                      final String imageUrl =
+                                          (product.images.isNotEmpty)
+                                          ? "https://oldmarket.bhoomi.cloud/${product.images.first}"
+                                          : 'assets/images/placeholder.jpg';
+                                      final String city =
+                                          product.location ?? "Unknown";
+                                      final String title = product.title;
+                                      final String description =
+                                          product.description;
+                                      final String price = "₹ ${product.price}";
+                                      final DateTime? createdAt =
+                                          product.createdAt;
+                                      return InkWell(
+                                        onTap: () {
+                                          recentlyViewedController.addProduct(
+                                            RecentlyViewedModel(
+                                              id: product.id,
+                                              title: product.title,
+                                              image: product.images.isNotEmpty
+                                                  ? product.images.first
+                                                  : "",
+                                              price: product.price.toString(),
+                                              type: "dealer",
+                                              createdAt: DateTime.now(),
+                                            ),
+                                          );
+                                          if (tokenController.isLoggedIn) {
+                                            Get.toNamed(
+                                              AppRoutes
+                                                  .dealer_product_description,
+                                              arguments: product.id,
+                                            );
+                                          } else {
+                                            Get.toNamed(AppRoutes.login);
+                                          }
+                                        },
+                                        child: ProductCard(
+                                          imagePath: imageUrl,
+                                          roomInfo: title,
+                                          price: price,
+                                          description: description,
+                                          location: city,
+                                          date: createdAt,
+                                          productId: product.id,
+                                          isDealer: true,
+                                          status: product.status,
+                                        ),
+                                      );
+                                    },
+                                  );
+                                }),
+                                SizedBox(height: AppSizer().height2),
+                              ], // End of dealer products conditional section
                             ],
                           ),
                         ], // Column children
@@ -2260,6 +2496,22 @@ class _HomeScreenState extends State<HomeScreen> {
             return BottomNavigationBar(
               currentIndex: controller.selectedIndex.value,
               onTap: (index) {
+                // Check if user is logged in for Ads and Chat tabs
+                if (index == 3 || index == 4) {
+                  if (!tokenController.isLoggedIn) {
+                    Get.snackbar(
+                      "Login Required",
+                      "Please login first",
+                      backgroundColor: AppColors.appRed,
+                      colorText: Colors.white,
+                      snackPosition: SnackPosition.BOTTOM,
+                      duration: const Duration(seconds: 2),
+                    );
+                    Get.toNamed(AppRoutes.login);
+                    return;
+                  }
+                }
+
                 // Open dedicated Ads route when Ads tab pressed (index 3)
                 if (index == 3) {
                   Get.toNamed(AppRoutes.ads);
@@ -2296,8 +2548,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // Check for openDrawer argument from navigation
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final arguments = Get.arguments;
-      if (arguments != null && 
-          arguments is Map<String, dynamic> && 
+      if (arguments != null &&
+          arguments is Map<String, dynamic> &&
           arguments['openDrawer'] == true) {
         print('🔥 [HomeScreen] Opening drawer due to navigation argument');
         // Open drawer after a small delay to ensure scaffold is built
@@ -2309,5 +2561,329 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     });
+  }
+
+  /// ✅ Show Create Business Account Dialog
+  void _showCreateBusinessAccountDialog(BuildContext context) {
+    final TextEditingController businessNameController =
+        TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.business, color: AppColors.appGreen, size: 28),
+            SizedBox(width: 12),
+            Text(
+              'Create Business Account',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enter your business name to create a vendor account:',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              controller: businessNameController,
+              decoration: InputDecoration(
+                labelText: 'Business Name',
+                hintText: 'e.g., ABC Motors',
+                prefixIcon: Icon(Icons.storefront, color: AppColors.appGreen),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.appGreen, width: 2),
+                ),
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'You will become a Vendor and can post products as a business.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final businessName = businessNameController.text.trim();
+              if (businessName.isEmpty) {
+                Get.snackbar(
+                  'Business Name Required',
+                  'Please enter your business name',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: Colors.orange.shade600,
+                  colorText: Colors.white,
+                  margin: EdgeInsets.all(16),
+                  icon: Icon(Icons.warning, color: Colors.white),
+                );
+                return;
+              }
+
+              // Create business account
+              await tokenController.createBusinessAccount(businessName);
+
+              print('✅ [HomeScreen] Business account created successfully');
+              print(
+                '   - Business Name: ${tokenController.businessName.value}',
+              );
+              print(
+                '   - Is Business Account: ${tokenController.isBusinessAccount.value}',
+              );
+              print(
+                '   - Business Role: ${tokenController.businessRole.value}',
+              );
+
+              Get.back(); // Close dialog
+
+              // ✅ Force immediate UI refresh
+              setState(() {});
+
+              // Show success message
+              Get.snackbar(
+                'Business Account Created!',
+                'Welcome to Vendor mode, $businessName! 🎉',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: AppColors.appGreen,
+                colorText: Colors.white,
+                margin: EdgeInsets.all(16),
+                duration: Duration(seconds: 4),
+                icon: Icon(Icons.check_circle, color: Colors.white, size: 28),
+              );
+
+              print(
+                '🔔 [HomeScreen] UI refreshed - drawer should now show business account',
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.appGreen,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Create Account',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+  }
+
+  /// ✅ Show Manage Business Account Dialog
+  void _showManageBusinessAccountDialog(BuildContext context) {
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.business, color: AppColors.appGreen, size: 28),
+            SizedBox(width: 12),
+            Text(
+              'Business Account',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.appGreen.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.appGreen.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.storefront,
+                        color: AppColors.appGreen,
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Business Name:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    tokenController.businessName.value,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.appGreen,
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(Icons.verified, color: AppColors.appGreen, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Role: Vendor',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 20),
+            Text(
+              'Would you like to remove your business account and revert to a normal user?',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // Confirm removal
+              Get.back(); // Close manage dialog
+
+              final confirmed = await Get.dialog<bool>(
+                AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  title: Row(
+                    children: [
+                      Icon(Icons.warning, color: Colors.orange, size: 28),
+                      SizedBox(width: 12),
+                      Text('Confirm Removal'),
+                    ],
+                  ),
+                  content: Text(
+                    'Are you sure you want to remove your business account?\n\nYou will revert to a normal user account.',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Get.back(result: false),
+                      child: Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Get.back(result: true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                      ),
+                      child: Text(
+                        'Remove',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirmed == true) {
+                // Remove business account
+                await tokenController.removeBusinessAccount();
+
+                print('✅ [HomeScreen] Business account removed');
+                print(
+                  '   - Is Business Account: ${tokenController.isBusinessAccount.value}',
+                );
+                print(
+                  '   - Reverted to: ${tokenController.businessRole.value}',
+                );
+
+                // ✅ Force immediate UI refresh
+                setState(() {});
+
+                // Show success message
+                Get.snackbar(
+                  'Business Account Removed',
+                  'You have been reverted to a User account.',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: Colors.orange.shade600,
+                  colorText: Colors.white,
+                  margin: EdgeInsets.all(16),
+                  icon: Icon(Icons.info, color: Colors.white),
+                );
+
+                print(
+                  '🔔 [HomeScreen] UI refreshed - drawer should now show user account',
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Remove Account',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

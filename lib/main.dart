@@ -17,6 +17,7 @@ import 'package:olx_prototype/src/controller/home_controller.dart';
 import 'package:olx_prototype/src/controller/recently_viewed_controller.dart';
 import 'package:olx_prototype/src/controller/theme_controller.dart';
 import 'package:olx_prototype/src/controller/token_controller.dart';
+import 'package:olx_prototype/src/controller/subscription_controller.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:olx_prototype/src/services/notification_services/notification_services.dart';
 import 'package:olx_prototype/src/services/deep_link_service.dart';
@@ -63,6 +64,9 @@ Future<void> main() async {
   Get.put(ChatController(), permanent: true);
   Get.put(RecentlyViewedController(), permanent: true);
   Get.put(ThemeController(), permanent: true);
+
+  // 🚀 Initialize Subscription Controller
+  Get.put(SubscriptionController(), permanent: true);
 
   // Initialize notifications
   await _initNotifications();
@@ -120,6 +124,11 @@ Future<void> _initDeepLinks() async {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
+  // ✅ Add ScaffoldMessenger key for snackbars
+  static final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
+
   @override
   Widget build(BuildContext context) {
     final ThemeController themeController = Get.find();
@@ -132,6 +141,7 @@ class MyApp extends StatelessWidget {
         return Obx(
           () => GetMaterialApp(
             debugShowCheckedModeBanner: false,
+            scaffoldMessengerKey: scaffoldMessengerKey, // ✅ Add this
             themeMode: themeController.theme,
             theme: ThemeData(
               brightness: Brightness.light,
@@ -140,6 +150,15 @@ class MyApp extends StatelessWidget {
               appBarTheme: const AppBarTheme(
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.black,
+              ),
+              // ✅ Add SnackBar theme for better visibility
+              snackBarTheme: SnackBarThemeData(
+                backgroundColor: AppColors.appGreen,
+                contentTextStyle: TextStyle(color: Colors.white, fontSize: 14),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
             darkTheme: ThemeData(
@@ -153,6 +172,15 @@ class MyApp extends StatelessWidget {
               appBarTheme: const AppBarTheme(
                 backgroundColor: Colors.black,
                 foregroundColor: Colors.white,
+              ),
+              // ✅ Add SnackBar theme for dark mode
+              snackBarTheme: SnackBarThemeData(
+                backgroundColor: AppColors.appGreen,
+                contentTextStyle: TextStyle(color: Colors.white, fontSize: 14),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
             initialRoute: AppRoutes.splash,

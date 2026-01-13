@@ -192,7 +192,7 @@ class _DealerDetailsProductScreenState
                                     ? ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
                                         child: Image.network(
-                                          "http://oldmarket.bhoomi.cloud/${product.images.first.replaceFirst(RegExp(r'^/+'), '')}",
+                                          "https://oldmarket.bhoomi.cloud/${product.images.first.replaceFirst(RegExp(r'^/+'), '')}",
                                           fit: BoxFit.cover,
                                           errorBuilder:
                                               (context, error, stackTrace) {

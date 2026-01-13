@@ -7,8 +7,8 @@ plugins {
 
 android {
     namespace = "com.example.olx_prototype"
-    compileSdk = flutter.compileSdkVersion
-
+    compileSdk = 36
+    
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -21,20 +21,29 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = "11"
     }
 
     defaultConfig {
         applicationId = "com.example.olx_prototype"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        multiDexEnabled = true
     }
 
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        debug {
+            isMinifyEnabled = false
         }
     }
 }
@@ -52,4 +61,18 @@ dependencies {
 
     // ✅ Java 8+ features ke liye ye add karna zaroori hai
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    
+    // 💳 Razorpay dependencies (required for razorpay_flutter)
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.activity:activity:1.8.2")
+    implementation("androidx.fragment:fragment:1.6.2")
+    implementation("androidx.multidex:multidex:2.0.1")
+    
+    // Additional dependencies for Android basic classes
+    implementation("androidx.core:core:1.12.0")
+    implementation("org.json:json:20231013")
+    
+    // SMS Retriever API for OTP autofill
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
+    implementation("com.google.android.gms:play-services-auth-api-phone:18.0.2")
 }

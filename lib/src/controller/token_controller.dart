@@ -11,6 +11,16 @@ class TokenController extends GetxController {
   // Expose saved user display name and photo url for UI
   var displayName = ''.obs;
   var photoUrl = ''.obs;
+  // Add observable user properties for easier access
+  var userUid = ''.obs;
+  var email = ''.obs;
+  var phoneNumber = ''.obs;
+
+  // ✅ Business Account Properties
+  var businessName = ''.obs;
+  var isBusinessAccount = false.obs;
+  var businessRole = 'User'.obs; // 'User' or 'Vendor'
+
   // For deep link navigation after login
   String? pendingProductId;
   String? pendingDealerProductId;
@@ -29,10 +39,37 @@ class TokenController extends GetxController {
       final logged = prefs.getBool('isLoggedIn') ?? false;
       final savedName = prefs.getString('user_display_name') ?? '';
       final savedPhoto = prefs.getString('user_photo_url') ?? '';
+      final savedUid = prefs.getString('user_uid') ?? '';
+      final savedEmail = prefs.getString('user_email') ?? '';
+      final savedPhone = prefs.getString('user_phone') ?? '';
+
+      // ✅ Load business account info
+      final savedBusinessName = prefs.getString('business_name') ?? '';
+      final savedIsBusinessAccount =
+          prefs.getBool('is_business_account') ?? false;
+      final savedBusinessRole = prefs.getString('business_role') ?? 'User';
+
       apiToken.value = token;
       loggedInFlag.value = logged;
       displayName.value = savedName;
       photoUrl.value = savedPhoto;
+      userUid.value = savedUid;
+      email.value = savedEmail;
+      phoneNumber.value = savedPhone;
+      businessName.value = savedBusinessName;
+      isBusinessAccount.value = savedIsBusinessAccount;
+      businessRole.value = savedBusinessRole;
+
+      // ✅ Log business account status
+      if (savedIsBusinessAccount) {
+        Logger.d(
+          'TokenController',
+          '🏢 Business Account Loaded: $savedBusinessName (Role: $savedBusinessRole)',
+        );
+      } else {
+        Logger.d('TokenController', '👤 Normal User Account');
+      }
+
       Logger.d(
         'TokenController',
         'Loaded token from storage: ${token.isNotEmpty ? 'Token exists' : 'No token'}',
@@ -104,9 +141,15 @@ class TokenController extends GetxController {
       // Save individual user info fields
       if (userInfo['uid'] != null) {
         await prefs.setString('user_uid', userInfo['uid']);
+        userUid.value = userInfo['uid'].toString();
       }
       if (userInfo['email'] != null) {
         await prefs.setString('user_email', userInfo['email']);
+        email.value = userInfo['email'].toString();
+      }
+      if (userInfo['phone'] != null) {
+        await prefs.setString('user_phone', userInfo['phone']);
+        phoneNumber.value = userInfo['phone'].toString();
       }
       if (userInfo['displayName'] != null) {
         await prefs.setString('user_display_name', userInfo['displayName']);
@@ -149,15 +192,106 @@ class TokenController extends GetxController {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('user_uid');
       await prefs.remove('user_email');
+      await prefs.remove('user_phone');
       await prefs.remove('user_display_name');
       await prefs.remove('user_photo_url');
       await prefs.remove('login_method');
+
+      // ✅ Clear business account info
+      await prefs.remove('business_name');
+      await prefs.remove('is_business_account');
+      await prefs.remove('business_role');
+
       displayName.value = '';
       photoUrl.value = '';
+      userUid.value = '';
+      email.value = '';
+      phoneNumber.value = '';
+      businessName.value = '';
+      isBusinessAccount.value = false;
+      businessRole.value = 'User';
+
       Logger.d('TokenController', 'User info cleared');
     } catch (e) {
       Logger.d('TokenController', 'Error clearing user info: $e');
     }
+  }
+
+  /// ✅ Create Business Account
+  Future<void> createBusinessAccount(String businessNameValue) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Save business account details
+      await prefs.setString('business_name', businessNameValue);
+      await prefs.setBool('is_business_account', true);
+      await prefs.setString('business_role', 'Vendor');
+
+      // Update observables
+      businessName.value = businessNameValue;
+      isBusinessAccount.value = true;
+      businessRole.value = 'Vendor';
+
+      Logger.d(
+        'TokenController',
+        '🏢 ✅ Business account created: $businessNameValue',
+      );
+      Logger.d(
+        'TokenController',
+        '   - Saved to SharedPreferences: business_name=$businessNameValue',
+      );
+      Logger.d(
+        'TokenController',
+        '   - Saved to SharedPreferences: is_business_account=true',
+      );
+      Logger.d(
+        'TokenController',
+        '   - Saved to SharedPreferences: business_role=Vendor',
+      );
+      Logger.d(
+        'TokenController',
+        '   - Observable updated: isBusinessAccount=${isBusinessAccount.value}',
+      );
+
+      // Verify save by reading back
+      final verifyName = prefs.getString('business_name');
+      final verifyIsBusinessAccount = prefs.getBool('is_business_account');
+      Logger.d(
+        'TokenController',
+        '🔍 Verification: business_name=$verifyName, is_business_account=$verifyIsBusinessAccount',
+      );
+    } catch (e) {
+      Logger.d('TokenController', '❌ Error creating business account: $e');
+    }
+  }
+
+  /// ✅ Remove Business Account (Revert to User)
+  Future<void> removeBusinessAccount() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Clear business account details
+      await prefs.remove('business_name');
+      await prefs.setBool('is_business_account', false);
+      await prefs.setString('business_role', 'User');
+
+      // Update observables
+      businessName.value = '';
+      isBusinessAccount.value = false;
+      businessRole.value = 'User';
+
+      Logger.d('TokenController', 'Business account removed, reverted to User');
+    } catch (e) {
+      Logger.d('TokenController', 'Error removing business account: $e');
+    }
+  }
+
+  /// ✅ Get Display Name (Business name if vendor, otherwise username)
+  String getDisplayName() {
+    if (isBusinessAccount.value && businessName.value.isNotEmpty) {
+      return businessName.value;
+    }
+    return displayName.value;
   }
 
   /// Check if user is logged in

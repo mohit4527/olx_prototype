@@ -1,4 +1,5 @@
 // ...existing code...
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
@@ -21,10 +22,33 @@ class _ShortVideoScreenState extends State<ShortVideoScreen> {
   final ShortVideoController controller = Get.put(ShortVideoController());
   late PageController _pageCtrl;
   int _initialPage = 0;
+  bool _showControls = true;
+  Timer? _hideTimer;
+
+  void _startHideTimer() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 6), () {
+      if (mounted) {
+        setState(() {
+          _showControls = false;
+        });
+      }
+    });
+  }
+
+  void _toggleControls() {
+    setState(() {
+      _showControls = !_showControls;
+      if (_showControls) {
+        _startHideTimer();
+      }
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+    _startHideTimer();
     // Determine if an initial video id was passed
     final arg = Get.arguments;
     print('[ShortVideoScreen] initState: raw Get.arguments => $arg');
@@ -133,6 +157,7 @@ class _ShortVideoScreenState extends State<ShortVideoScreen> {
 
   @override
   void dispose() {
+    _hideTimer?.cancel();
     _pageCtrl.dispose();
     super.dispose();
   }
@@ -172,12 +197,15 @@ class _ShortVideoScreenState extends State<ShortVideoScreen> {
               return Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Video Player
-                  VideoPlayerWidget(
-                    videoUrl: videoUrl,
-                    onDoubleTap: () async {
-                      await controller.toggleLike(index);
-                    },
+                  // Video Player with tap detection
+                  GestureDetector(
+                    onTap: _toggleControls,
+                    child: VideoPlayerWidget(
+                      videoUrl: videoUrl,
+                      onDoubleTap: () async {
+                        await controller.toggleLike(index);
+                      },
+                    ),
                   ),
 
                   // Bottom left info
@@ -240,14 +268,18 @@ class _ShortVideoScreenState extends State<ShortVideoScreen> {
                               },
                             ),
                             SizedBox(width: 8),
-                            Text(
-                              (video.uploaderName.isNotEmpty)
-                                  ? video.uploaderName
-                                  : 'Unknown user',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                            Expanded(
+                              child: Text(
+                                (video.uploaderName.isNotEmpty)
+                                    ? video.uploaderName
+                                    : 'Unknown user',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
                             ),
                           ],
@@ -268,9 +300,9 @@ class _ShortVideoScreenState extends State<ShortVideoScreen> {
                     ),
                   ),
 
-                  // Right action column
+                  // Right action column (Instagram Reels style positioning - bottom right)
                   Positioned(
-                    right: 8,
+                    right: 12,
                     bottom: 80,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -288,18 +320,22 @@ class _ShortVideoScreenState extends State<ShortVideoScreen> {
                                 Icon(
                                   Icons.favorite,
                                   color: isLiked ? Colors.red : Colors.white,
-                                  size: 36,
+                                  size: 32,
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 Text(
                                   "${video.likes.length}",
-                                  style: const TextStyle(color: Colors.white),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ],
                             ),
                           );
                         }),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
                         // Comment
                         GestureDetector(
@@ -317,17 +353,21 @@ class _ShortVideoScreenState extends State<ShortVideoScreen> {
                               const Icon(
                                 Icons.comment,
                                 color: Colors.white,
-                                size: 32,
+                                size: 30,
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 4),
                               Text(
                                 "${video.comments.length}",
-                                style: const TextStyle(color: Colors.white),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
                         // Share
                         GestureDetector(
@@ -370,19 +410,20 @@ class _ShortVideoScreenState extends State<ShortVideoScreen> {
                           },
                           child: Column(
                             children: const [
-                              Icon(Icons.share, color: Colors.white, size: 30),
-                              SizedBox(height: 6),
+                              Icon(Icons.share, color: Colors.white, size: 28),
+                              SizedBox(height: 4),
                               Text(
                                 "Share",
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 12,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
                         // Add/Upload new video
                         GestureDetector(
@@ -394,14 +435,15 @@ class _ShortVideoScreenState extends State<ShortVideoScreen> {
                               Icon(
                                 Icons.add_circle,
                                 color: Colors.white,
-                                size: 34,
+                                size: 32,
                               ),
-                              SizedBox(height: 6),
+                              SizedBox(height: 4),
                               Text(
                                 "Upload",
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 12,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
@@ -411,33 +453,72 @@ class _ShortVideoScreenState extends State<ShortVideoScreen> {
                     ),
                   ),
 
-                  // Top bar
-                  Positioned(
-                    top: 40,
-                    left: 12,
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.white,
+                  // Buy button - bottom right corner (small size, always visible)
+                  if (video.productId.isNotEmpty &&
+                      video.productId != video.uploaderId)
+                    Positioned(
+                      bottom: 20,
+                      right: 12,
+                      child: GestureDetector(
+                        onTap: () async {
+                          try {
+                            Get.toNamed(
+                              '/description_screen',
+                              arguments: {'id': video.productId},
+                            );
+                          } catch (e) {
+                            Get.snackbar(
+                              'Error',
+                              'Unable to open product',
+                              snackPosition: SnackPosition.BOTTOM,
+                            );
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
                           ),
-                          onPressed: () => Get.back(),
-                        ),
-                        const SizedBox(width: 8),
-                        Center(
-                          child: const Text(
-                            "Short Videos",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.green.shade500,
+                                Colors.green.shade700,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(
+                                Icons.shopping_bag,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                "Buy",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
                 ],
               );
             },

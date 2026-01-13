@@ -141,6 +141,21 @@ class AdsController extends GetxController {
 
       final mine = await ApiService.getMyProducts();
 
+      // 🔍 DEBUG: Print first product's location data
+      if (mine.isNotEmpty) {
+        final firstProduct = mine.first;
+        print('🔍🔍🔍 [AdsController] First Product Debug:');
+        print('   Title: ${firstProduct.title}');
+        print('   Location object: ${firstProduct.location}');
+        if (firstProduct.location != null) {
+          print('   Location.city: "${firstProduct.location!.city}"');
+          print('   Location.state: "${firstProduct.location!.state}"');
+          print('   Location.country: "${firstProduct.location!.country}"');
+        } else {
+          print('   Location is NULL!');
+        }
+      }
+
       // Additional safety check: ensure all products belong to current user
       List<AllProductModel> filteredProducts = mine;
       if (currentUserId.isNotEmpty) {

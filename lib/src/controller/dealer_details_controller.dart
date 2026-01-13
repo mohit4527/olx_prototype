@@ -22,34 +22,120 @@ class DealerController extends GetxController {
   /// Fetch all dealers for home screen
   Future<void> fetchAllDealers() async {
     print("🔄 [Controller] fetchAllDealers started");
+    print("=" * 80);
     try {
       isDealerListLoading.value = true;
       errorMessage.value = '';
 
       final data = await ApiService.getAllDealers();
-      print("📊 [Controller] API Response: $data");
+      print("📊 [Controller] Dealers API Response status: ${data?["status"]}");
+      print(
+        "📊 [Controller] Total dealers in response: ${(data?["data"] as List?)?.length ?? 0}",
+      );
 
       if (data != null && data["status"] == true) {
-        dealers.value = (data["data"] as List).map((e) {
-          print("🧩 [Controller] Dealer JSON: $e");
-          final dealer = DealerStats.fromJson(e);
+        // Fetch all products to count per dealer
+        print("\n🔍 [Controller] Fetching all products...");
+        final productsList = await ApiService.getAllProducts();
+        print("📦 [Controller] Total products fetched: ${productsList.length}");
+
+        // Debug: Print first 5 products to see their structure
+        print("\n🔬 [Controller] Sample products (first 5):");
+        for (
+          int i = 0;
+          i < (productsList.length > 5 ? 5 : productsList.length);
+          i++
+        ) {
           print(
-            "✅ [Controller] Parsed Dealer: imageUrl=${dealer.imageUrl}, businessLogo=${dealer.businessLogo}",
+            "   Product $i: id=${productsList[i].id}, userId=${productsList[i].userId}",
           );
+        }
+
+        // Count products per dealer/userId
+        Map<String, int> dealerProductCounts = {};
+        for (var product in productsList) {
+          final userId = product.userId; // userId is the dealer/seller ID
+          if (userId.isNotEmpty) {
+            dealerProductCounts[userId] =
+                (dealerProductCounts[userId] ?? 0) + 1;
+          }
+        }
+        print("\n📈 [Controller] Product counts by userId:");
+        dealerProductCounts.forEach((userId, count) {
+          print("   userId: $userId => $count products");
+        });
+
+        print("\n🏪 [Controller] Processing dealers...");
+        dealers.value = (data["data"] as List).map((e) {
+          final dealerProfileId = e['_id']?.toString() ?? '';
+
+          // Extract userId - try multiple variations
+          String dealerUserId = '';
+          if (e['userId'] != null && e['userId'].toString().isNotEmpty) {
+            dealerUserId = e['userId'].toString();
+          } else if (e['user_id'] != null &&
+              e['user_id'].toString().isNotEmpty) {
+            dealerUserId = e['user_id'].toString();
+          }
+
+          final businessName = e['businessName']?.toString() ?? 'Unknown';
+
+          print("\n🧩 [Dealer] businessName: $businessName");
+          print("   Profile _id: $dealerProfileId");
+          print("   🔍 ALL DEALER FIELDS: ${e.keys.toList()}");
+          print("   Raw userId field exists: ${e.containsKey('userId')}");
+          print("   Raw userId value: ${e['userId']}");
+          print("   Extracted userId: '$dealerUserId'");
+
+          // Try matching with both _id and userId
+          int vehicleCountById = dealerProductCounts[dealerProfileId] ?? 0;
+          int vehicleCountByUserId = dealerProductCounts[dealerUserId] ?? 0;
+
+          print("   Products matched by _id: $vehicleCountById");
+          print("   Products matched by userId: $vehicleCountByUserId");
+
+          // Use whichever has more products (prefer userId match)
+          final vehicleCount = vehicleCountByUserId > 0
+              ? vehicleCountByUserId
+              : vehicleCountById;
+
+          print("   ✅ Final vehicle count: $vehicleCount");
+
+          // Add vehicle count to dealer data
+          e['totalVehicles'] = vehicleCount;
+          e['totalStock'] = vehicleCount;
+          e['totalSold'] = 0; // We don't have sold data from products
+
+          final dealer = DealerStats.fromJson(e);
           return dealer;
         }).toList();
+
+        // 🔥 Sort dealers by vehicle count - DESCENDING (highest first)
+        dealers.sort((a, b) => b.totalVehicles.compareTo(a.totalVehicles));
+        print("\n🔄 [Controller] Dealers sorted by vehicle count (descending)");
+        print("   Top 3 dealers:");
+        for (int i = 0; i < (dealers.length > 3 ? 3 : dealers.length); i++) {
+          print(
+            "   ${i + 1}. ${dealers[i].businessName} => ${dealers[i].totalVehicles} vehicles",
+          );
+        }
+
+        print("\n✅ [Controller] Total dealers loaded: ${dealers.length}");
+        print("=" * 80);
       } else {
         dealers.clear();
         errorMessage.value = data?["message"] ?? "Failed to load dealers";
         print("⚠️ [Controller] Error Message: ${errorMessage.value}");
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       dealers.clear();
       errorMessage.value = "Error fetching dealers: $e";
       print("❌ [Controller] Exception: $e");
+      print("❌ [Controller] StackTrace: $stackTrace");
     } finally {
       isDealerListLoading.value = false;
       print("✅ [Controller] fetchAllDealers completed");
+      print("=" * 80);
     }
   }
 

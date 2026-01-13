@@ -15,6 +15,7 @@ class GetProfileController extends GetxController {
     "Email": "",
     "Gender": "",
     "Date Of Birth": "",
+    "BusinessName": "",
   }.obs;
 
   @override
@@ -168,6 +169,8 @@ class GetProfileController extends GetxController {
         imagePath.value = savedImage;
       }
     }
+    // Load business name if available
+    profileData['BusinessName'] = prefs.getString('user_business_name') ?? '';
     // notify listeners
     profileData.refresh();
     imagePath.refresh();
@@ -206,6 +209,70 @@ class GetProfileController extends GetxController {
   }
 
   String get name => profileData["Username"] ?? "";
+
+  /// 🔥 Update role to Vendor when business account is created
+  Future<void> updateRoleToDealer() async {
+    profileData['Role'] = 'Vendor';
+    await _loadBusinessName();
+    saveProfileToPrefs();
+    profileData.refresh();
+    print('✅ [GetProfileController] Role updated to Vendor');
+  }
+
+  /// 🔥 Load business name from dealer profile API
+  Future<void> _loadBusinessName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId =
+          prefs.getString('user_uid') ?? prefs.getString('userId') ?? '';
+
+      if (userId.isEmpty) {
+        print(
+          '⚠️ [GetProfileController] No userId found, cannot load business name',
+        );
+        return;
+      }
+
+      final url = Uri.parse(
+        'https://oldmarket.bhoomi.cloud/api/dealer-profiles',
+      );
+      final res = await http.get(url);
+
+      if (res.statusCode == 200) {
+        final body = json.decode(res.body);
+        final profiles = body['data'] as List?;
+
+        if (profiles != null) {
+          for (var profile in profiles) {
+            if (profile['userId'] == userId) {
+              final businessName = profile['businessName']?.toString() ?? '';
+              if (businessName.isNotEmpty) {
+                profileData['BusinessName'] = businessName;
+                await prefs.setString('user_business_name', businessName);
+                print(
+                  '✅ [GetProfileController] Business name loaded: $businessName',
+                );
+              }
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('❌ [GetProfileController] Error loading business name: $e');
+    }
+  }
+
+  /// 🔥 Update role to User when dealer profile is removed
+  Future<void> updateRoleToUser() async {
+    profileData['Role'] = 'User';
+    profileData['BusinessName'] = '';
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_business_name');
+    saveProfileToPrefs();
+    profileData.refresh();
+    print('✅ [GetProfileController] Role updated to User');
+  }
 
   Future getImageByCamera() async {
     final ImagePicker _picker = ImagePicker();

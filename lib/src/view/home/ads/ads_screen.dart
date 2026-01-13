@@ -188,10 +188,10 @@ class _AdsScreenState extends State<AdsScreen>
         }
       },
       child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        elevation: 4,
-        shadowColor: Colors.black.withOpacity(0.08),
-        margin: const EdgeInsets.all(3),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 3,
+        shadowColor: Colors.black.withOpacity(0.1),
+        margin: const EdgeInsets.all(4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -201,7 +201,7 @@ class _AdsScreenState extends State<AdsScreen>
                 top: Radius.circular(8),
               ),
               child: Container(
-                height: 115,
+                height: 100,
                 color: Colors.grey[100],
                 child: imageUrl.isNotEmpty
                     ? Image.network(
@@ -244,29 +244,29 @@ class _AdsScreenState extends State<AdsScreen>
               ),
             ),
             Container(
-              padding: const EdgeInsets.all(6.0),
+              padding: const EdgeInsets.all(4.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Title text with proper height
                   Container(
-                    height: 20,
+                    height: 15,
                     child: Text(
                       p.title ?? '',
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                        fontSize: 13,
                         color: Colors.black87,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   // Price with fixed height
                   Container(
-                    height: 18,
+                    height: 14,
                     child: Text(
                       _currency.format(
                         double.tryParse((p.price ?? '0').toString()) ?? 0,
@@ -278,93 +278,61 @@ class _AdsScreenState extends State<AdsScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   // Location with fixed height
                   Container(
-                    height: 16,
+                    height: 14,
                     child: Builder(
                       builder: (_) {
                         final loc = p.location;
-                        String locationText = '';
-                        try {
-                          if (loc == null) {
-                            locationText = '';
-                          } else if (loc is String) {
-                            locationText = loc;
-                          } else if (loc is Map) {
-                            final city = (loc['city'] ?? loc['town'] ?? '')
-                                .toString();
-                            final state = (loc['state'] ?? '').toString();
-                            final country = (loc['country'] ?? '').toString();
-                            final parts = [
-                              city,
-                              state,
-                              country,
-                            ].where((s) => s.isNotEmpty).toList();
+                        String locationText = 'Location';
+
+                        if (loc != null) {
+                          print(
+                            '🔍 Location object: city=${loc.city}, state=${loc.state}, country=${loc.country}',
+                          );
+                          // location is a Location object with city, state, country properties
+                          final city = loc.city.trim();
+                          final state = loc.state.trim();
+
+                          print('🔍 After trim: city="$city", state="$state"');
+
+                          // Build location text from city and state
+                          final parts = <String>[];
+                          if (city.isNotEmpty &&
+                              city.toLowerCase() != 'unknown') {
+                            parts.add(city);
+                          }
+                          if (state.isNotEmpty &&
+                              state.toLowerCase() != 'unknown') {
+                            parts.add(state);
+                          }
+
+                          print('🔍 Parts list: $parts');
+
+                          if (parts.isNotEmpty) {
                             locationText = parts.join(', ');
-                          } else if (loc is List) {
-                            // join list items
-                            try {
-                              locationText = loc
-                                  .map((e) => e?.toString() ?? '')
-                                  .where((s) => s.isNotEmpty)
-                                  .join(', ');
-                            } catch (_) {
-                              locationText = loc.toString();
-                            }
-                          } else {
-                            // attempt dynamic property access (city/state/country)
-                            try {
-                              final city =
-                                  (loc.city ?? loc['city'] ?? loc.town ?? '')
-                                      ?.toString() ??
-                                  '';
-                              final state =
-                                  (loc.state ?? loc['state'] ?? '')
-                                      ?.toString() ??
-                                  '';
-                              final country =
-                                  (loc.country ?? loc['country'] ?? '')
-                                      ?.toString() ??
-                                  '';
-                              final parts = [
-                                city,
-                                state,
-                                country,
-                              ].where((s) => s.isNotEmpty).toList();
-                              locationText = parts.join(', ');
-                              if (locationText.isEmpty)
-                                locationText = loc.toString();
-                            } catch (_) {
-                              // fallback to toString
-                              try {
-                                locationText = loc?.toString() ?? '';
-                              } catch (_) {
-                                locationText = '';
-                              }
-                            }
                           }
-                        } catch (_) {
-                          try {
-                            locationText = loc?.toString() ?? '';
-                          } catch (_) {
-                            locationText = '';
-                          }
+
+                          print('🔍 Final locationText: "$locationText"');
+                        } else {
+                          print('🔍 Location is NULL for product: ${p.title}');
                         }
+
                         return Row(
                           children: [
                             Icon(
                               Icons.location_on,
-                              size: 13,
-                              color: Colors.grey.shade800,
+                              size: 14,
+                              color: Colors.grey.shade600,
                             ),
-                            const SizedBox(width: 3),
+                            const SizedBox(width: 2),
                             Expanded(
                               child: Text(
                                 locationText,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w400,
-                                  color: Colors.grey.shade800,
+                                  color: Colors.grey.shade600,
                                   fontSize: 11,
                                 ),
                                 maxLines: 1,
@@ -382,153 +350,240 @@ class _AdsScreenState extends State<AdsScreen>
 
             if (showActions)
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 4.0,
-                  vertical: 2.0,
+                padding: const EdgeInsets.only(
+                  right: 4.0,
+                  top: 0.0,
+                  bottom: 0.0,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Tooltip(
-                      message: 'Edit',
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minHeight: 24,
-                          minWidth: 24,
-                        ),
-                        icon: const Icon(
-                          Icons.edit,
-                          size: 16,
-                          color: Colors.blue,
-                        ),
-                        onPressed: () async {
-                          final res = await Get.toNamed(
-                            AppRoutes.edit_product,
-                            arguments: {'product': p},
-                          );
+                    // First Row: Edit and Delete icons
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Tooltip(
+                          message: 'Edit',
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minHeight: 24,
+                              minWidth: 24,
+                            ),
+                            icon: const Icon(
+                              Icons.edit,
+                              size: 16,
+                              color: Colors.blue,
+                            ),
+                            onPressed: () async {
+                              final res = await Get.toNamed(
+                                AppRoutes.edit_product,
+                                arguments: {'product': p},
+                              );
 
-                          // If the editor returned an updated product, apply it locally
-                          if (res is Map && res['product'] != null) {
-                            final updated = res['product'];
-                            try {
-                              if (isDealer) {
-                                // Replace in dealerProducts list
-                                final idx = controller.dealerProducts
-                                    .indexWhere((d) => d.id == updated.id);
-                                if (idx >= 0) {
-                                  controller.dealerProducts[idx] = updated;
-                                } else {
-                                  // fallback: refresh dealer products
-                                  await controller.fetchDealerProducts();
+                              // If the editor returned an updated product, apply it locally
+                              if (res is Map && res['product'] != null) {
+                                final updated = res['product'];
+                                try {
+                                  if (isDealer) {
+                                    // Replace in dealerProducts list
+                                    final idx = controller.dealerProducts
+                                        .indexWhere((d) => d.id == updated.id);
+                                    if (idx >= 0) {
+                                      controller.dealerProducts[idx] = updated;
+                                    } else {
+                                      // fallback: refresh dealer products
+                                      await controller.fetchDealerProducts();
+                                    }
+                                  } else {
+                                    final idx = controller.myProducts
+                                        .indexWhere((d) => d.id == updated.id);
+                                    if (idx >= 0) {
+                                      controller.myProducts[idx] = updated;
+                                    } else {
+                                      await controller.fetchMyProducts();
+                                    }
+                                  }
+                                  Get.snackbar(
+                                    'Saved',
+                                    'Product updated',
+                                    backgroundColor: AppColors.appGreen,
+                                    colorText: Colors.white,
+                                  );
+                                } catch (e) {
+                                  // On error, fall back to refreshing the relevant list
+                                  if (isDealer)
+                                    await controller.fetchDealerProducts();
+                                  else
+                                    await controller.fetchMyProducts();
                                 }
-                              } else {
-                                final idx = controller.myProducts.indexWhere(
-                                  (d) => d.id == updated.id,
-                                );
-                                if (idx >= 0) {
-                                  controller.myProducts[idx] = updated;
+                                return;
+                              }
+                              if (res == true) {
+                                if (isDealer) {
+                                  await controller.fetchDealerProducts();
                                 } else {
                                   await controller.fetchMyProducts();
                                 }
+                                Get.snackbar(
+                                  'Saved',
+                                  'Product updated',
+                                  backgroundColor: AppColors.appGreen,
+                                  colorText: Colors.white,
+                                );
                               }
-                              Get.snackbar(
-                                'Saved',
-                                'Product updated',
-                                backgroundColor: AppColors.appGreen,
-                                colorText: Colors.white,
-                              );
-                            } catch (e) {
-                              // On error, fall back to refreshing the relevant list
-                              if (isDealer)
-                                await controller.fetchDealerProducts();
-                              else
-                                await controller.fetchMyProducts();
-                            }
-                            return;
-                          }
-
-                          // older behavior: boolean success indicator
-                          if (res == true) {
-                            if (isDealer) {
-                              await controller.fetchDealerProducts();
-                            } else {
-                              await controller.fetchMyProducts();
-                            }
-                            Get.snackbar(
-                              'Saved',
-                              'Product updated',
-                              backgroundColor: AppColors.appGreen,
-                              colorText: Colors.white,
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 2),
-                    Tooltip(
-                      message: 'Delete',
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minHeight: 24,
-                          minWidth: 24,
+                            },
+                          ),
                         ),
-                        icon: const Icon(
-                          Icons.delete,
-                          size: 16,
-                          color: Colors.red,
-                        ),
-                        onPressed: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              title: const Text('Delete Product'),
-                              content: const Text(
-                                'Are you sure you want to delete this product?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(context, false),
-                                  child: const Text('Cancel'),
-                                ),
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context, true),
-                                  child: const Text('Delete'),
-                                ),
-                              ],
+                        Tooltip(
+                          message: 'Delete',
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minHeight: 24,
+                              minWidth: 24,
                             ),
-                          );
-                          if (confirm == true) {
-                            bool ok = false;
-                            if (isDealer) {
-                              ok = await controller.deleteDealerProduct(
-                                p.sellerType,
-                                p.id,
+                            icon: const Icon(
+                              Icons.delete,
+                              size: 16,
+                              color: Colors.red,
+                            ),
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text('Delete Product'),
+                                  content: const Text(
+                                    'Are you sure you want to delete this product?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
                               );
-                              if (ok) await controller.fetchDealerProducts();
-                            } else {
-                              ok = await controller.deleteProduct(p.id);
-                              if (ok) await controller.fetchMyProducts();
-                            }
-                            if (ok) {
-                              Get.snackbar(
-                                'Deleted',
-                                'Product deleted',
-                                backgroundColor: AppColors.appGreen,
-                                colorText: Colors.white,
-                              );
-                            } else {
-                              Get.snackbar(
-                                'Error',
-                                'Failed to delete',
-                                backgroundColor: Colors.red,
-                                colorText: Colors.white,
-                              );
-                            }
-                          }
-                        },
+                              if (confirm == true) {
+                                bool ok = false;
+                                if (isDealer) {
+                                  ok = await controller.deleteDealerProduct(
+                                    p.sellerType,
+                                    p.id,
+                                  );
+                                  if (ok)
+                                    await controller.fetchDealerProducts();
+                                } else {
+                                  ok = await controller.deleteProduct(p.id);
+                                  if (ok) await controller.fetchMyProducts();
+                                }
+                                if (ok) {
+                                  Get.snackbar(
+                                    'Deleted',
+                                    'Product deleted',
+                                    backgroundColor: AppColors.appGreen,
+                                    colorText: Colors.white,
+                                  );
+                                } else {
+                                  Get.snackbar(
+                                    'Error',
+                                    'Failed to delete',
+                                    backgroundColor: Colors.red,
+                                    colorText: Colors.white,
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Second Row: Status text and Toggle (REDUCED HEIGHT SPACING)
+                    Transform.translate(
+                      offset: const Offset(0, -18),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            p.status == true ? 'Active' : 'Sold',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: p.status == true
+                                  ? Colors.green
+                                  : Colors.red,
+                            ),
+                          ),
+                          Transform.scale(
+                            scale: 0.5,
+                            child: Switch(
+                              value: p.status == true,
+                              activeColor: Colors.green,
+                              inactiveThumbColor: Colors.red,
+                              onChanged: (val) async {
+                                // Update status via API
+                                bool success = false;
+                                if (isDealer) {
+                                  success =
+                                      await ApiService.updateDealerProductStatus(
+                                        carId: p.id,
+                                        status: val,
+                                      );
+                                } else {
+                                  success =
+                                      await ApiService.updateUserProductStatus(
+                                        productId: p.id,
+                                        status: val,
+                                      );
+                                }
+
+                                if (success) {
+                                  // Update the product status locally
+                                  if (isDealer) {
+                                    final idx = controller.dealerProducts
+                                        .indexWhere((d) => d.id == p.id);
+                                    if (idx >= 0) {
+                                      controller.dealerProducts[idx].status =
+                                          val;
+                                      controller.dealerProducts.refresh();
+                                      controller.update(['products']);
+                                    }
+                                  } else {
+                                    final idx = controller.myProducts
+                                        .indexWhere((d) => d.id == p.id);
+                                    if (idx >= 0) {
+                                      controller.myProducts[idx].status = val;
+                                      controller.myProducts.refresh();
+                                      controller.update(['products']);
+                                    }
+                                  }
+                                  Get.snackbar(
+                                    'Updated',
+                                    val
+                                        ? 'Product marked as Active'
+                                        : 'Product marked as Sold Out',
+                                    backgroundColor: AppColors.appGreen,
+                                    colorText: Colors.white,
+                                  );
+                                } else {
+                                  Get.snackbar(
+                                    'Error',
+                                    'Failed to update product status',
+                                    backgroundColor: Colors.red,
+                                    colorText: Colors.white,
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -670,74 +725,34 @@ class _AdsScreenState extends State<AdsScreen>
                       child: Builder(
                         builder: (_) {
                           final loc = p.location;
-                          String locationText = '';
-                          try {
-                            if (loc == null) {
-                              locationText = '';
-                            } else if (loc is String) {
-                              locationText = loc;
-                            } else if (loc is Map) {
-                              final city = (loc['city'] ?? loc['town'] ?? '')
-                                  .toString();
-                              final state = (loc['state'] ?? '').toString();
-                              final country = (loc['country'] ?? '').toString();
-                              final parts = [
-                                city,
-                                state,
-                                country,
-                              ].where((s) => s.isNotEmpty).toList();
-                              locationText = parts.join(', ');
-                            } else if (loc is List) {
-                              try {
-                                locationText = loc
-                                    .map((e) => e?.toString() ?? '')
-                                    .where((s) => s.isNotEmpty)
-                                    .join(', ');
-                              } catch (_) {
-                                locationText = loc.toString();
-                              }
-                            } else {
-                              try {
-                                final city =
-                                    (loc.city ?? loc['city'] ?? loc.town ?? '')
-                                        ?.toString() ??
-                                    '';
-                                final state =
-                                    (loc.state ?? loc['state'] ?? '')
-                                        ?.toString() ??
-                                    '';
-                                final country =
-                                    (loc.country ?? loc['country'] ?? '')
-                                        ?.toString() ??
-                                    '';
-                                final parts = [
-                                  city,
-                                  state,
-                                  country,
-                                ].where((s) => s.isNotEmpty).toList();
-                                locationText = parts.join(', ');
-                                if (locationText.isEmpty)
-                                  locationText = loc.toString();
-                              } catch (_) {
-                                try {
-                                  locationText = loc?.toString() ?? '';
-                                } catch (_) {
-                                  locationText = '';
-                                }
-                              }
+                          String locationText = 'Location';
+
+                          if (loc != null) {
+                            // location is a Location object with city, state, country properties
+                            final city = loc.city.trim();
+                            final state = loc.state.trim();
+
+                            // Build location text from city and state
+                            final parts = <String>[];
+                            if (city.isNotEmpty &&
+                                city.toLowerCase() != 'unknown') {
+                              parts.add(city);
                             }
-                          } catch (_) {
-                            try {
-                              locationText = loc?.toString() ?? '';
-                            } catch (_) {
-                              locationText = '';
+                            if (state.isNotEmpty &&
+                                state.toLowerCase() != 'unknown') {
+                              parts.add(state);
+                            }
+
+                            if (parts.isNotEmpty) {
+                              locationText = parts.join(', ');
                             }
                           }
+
                           return Row(
                             children: [
                               Icon(
                                 Icons.location_on,
-                                size: 14,
+                                size: 12,
                                 color: Colors.grey.shade600,
                               ),
                               const SizedBox(width: 3),
@@ -1413,16 +1428,16 @@ class _AdsScreenState extends State<AdsScreen>
                                 vertical: 5.0,
                               ),
                               child: GridView.builder(
-                                padding: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.all(6),
                                 gridDelegate:
                                     SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: 2,
                                       // Better aspect ratio for profile view cards (taller cards)
                                       childAspectRatio: _isProfileView
                                           ? 0.75
-                                          : 0.635,
-                                      mainAxisSpacing: 5,
-                                      crossAxisSpacing: 5,
+                                          : 0.63,
+                                      mainAxisSpacing: 8,
+                                      crossAxisSpacing: 8,
                                     ),
                                 itemCount: _getFilteredContent().length,
                                 itemBuilder: (ctx, idx) {
@@ -1502,13 +1517,13 @@ class _AdsScreenState extends State<AdsScreen>
                             );
 
                           return GridView.builder(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(6),
                             gridDelegate:
                                 const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
-                                  childAspectRatio: 0.660,
-                                  mainAxisSpacing: 5,
-                                  crossAxisSpacing: 5,
+                                  childAspectRatio: 0.63,
+                                  mainAxisSpacing: 8,
+                                  crossAxisSpacing: 8,
                                 ),
                             itemCount: ctrl.myProducts.length,
                             itemBuilder: (ctx, idx) => _productCard(

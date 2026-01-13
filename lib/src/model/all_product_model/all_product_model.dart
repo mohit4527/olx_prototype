@@ -10,6 +10,7 @@ class AllProductModel {
   final String? phone; // 🔹 Added phone field
   final Location location;
   final String? createdAt;
+  bool? status;
 
   AllProductModel({
     required this.id,
@@ -23,7 +24,13 @@ class AllProductModel {
     this.phone, // 🔹 Phone is optional
     required this.location,
     required this.createdAt, // ✅ Add this
+    this.status,
   });
+
+  // 🔥 Getters for easy access to location properties
+  String? get country => location.country.isNotEmpty ? location.country : null;
+  String? get state => location.state.isNotEmpty ? location.state : null;
+  String? get city => location.city.isNotEmpty ? location.city : null;
 
   factory AllProductModel.fromJson(Map<String, dynamic> json) {
     // Robust extraction of userId from various backend schemas
@@ -87,9 +94,14 @@ class AllProductModel {
           json['phoneNumber']?.toString() ??
           json['userPhone']?.toString(), // 🔹 Extract phone from API
       location: json['location'] != null
-          ? Location.fromJson(json['location'])
-          : Location(country: '', state: '', city: ''),
+          ? Location.fromJson(json['location'] as Map<String, dynamic>, json)
+          : Location(
+              country: json['country']?.toString() ?? '',
+              state: json['state']?.toString() ?? '',
+              city: json['city']?.toString() ?? '',
+            ),
       createdAt: json['createdAt'] ?? '', // keep as-is
+      status: json['status'] as bool?,
     );
   }
 }
@@ -101,11 +113,22 @@ class Location {
 
   Location({required this.country, required this.state, required this.city});
 
-  factory Location.fromJson(Map<String, dynamic> json) {
-    return Location(
-      country: json['country'] ?? '',
-      state: json['state'] ?? '',
-      city: json['city'] ?? '',
-    );
+  factory Location.fromJson(
+    Map<String, dynamic> json, [
+    Map<String, dynamic>? rootJson,
+  ]) {
+    // First try to get from location object itself
+    String city = json['city']?.toString() ?? '';
+    String state = json['state']?.toString() ?? '';
+    String country = json['country']?.toString() ?? '';
+
+    // If location object is empty (like {type: Point}), check root level
+    if (city.isEmpty && state.isEmpty && country.isEmpty && rootJson != null) {
+      city = rootJson['city']?.toString() ?? '';
+      state = rootJson['state']?.toString() ?? '';
+      country = rootJson['country']?.toString() ?? '';
+    }
+
+    return Location(country: country, state: state, city: city);
   }
 }

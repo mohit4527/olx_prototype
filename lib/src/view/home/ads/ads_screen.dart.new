@@ -37,7 +37,7 @@ class _AdsScreenState extends State<AdsScreen> {
     if (path.isEmpty) return '';
     final fixed = path.replaceAll('\\', '/');
     if (fixed.startsWith('http')) return fixed;
-    const baseAssets = 'http://oldmarket.bhoomi.cloud/';
+    const baseAssets = 'https://oldmarket.bhoomi.cloud/';
     final rel = fixed.startsWith('/') ? fixed.substring(1) : fixed;
     return '$baseAssets$rel';
   }

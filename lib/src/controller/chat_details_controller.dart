@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
 import '../model/chat_model/chat_model.dart';
 import '../services/apiServices/apiServices.dart';
@@ -13,6 +15,8 @@ class ChatDetailsController extends GetxController {
   var messages = <Message>[].obs;
   var isLoading = true.obs;
   var isReady = false.obs;
+  var isSendingMedia = false.obs;
+  final ImagePicker _picker = ImagePicker();
 
   Future<void> initChat(dynamic newChatArg) async {
     try {
@@ -143,6 +147,145 @@ class ChatDetailsController extends GetxController {
         backgroundColor: AppColors.appRed,
         colorText: AppColors.appWhite,
       );
+    }
+  }
+
+  // Pick and send image
+  Future<void> pickAndSendImage({required ImageSource source}) async {
+    try {
+      print('📷 [ChatMedia] Starting image picker, source: $source');
+
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+
+      if (pickedFile == null) {
+        print('⚠️ [ChatMedia] No image selected');
+        return;
+      }
+
+      print('✅ [ChatMedia] Image picked: ${pickedFile.path}');
+      final file = File(pickedFile.path);
+      await _sendMediaFile(file, 'image');
+    } catch (e) {
+      print('❌ [ChatMedia] Error picking image: $e');
+      Get.snackbar(
+        "Error",
+        "Failed to pick image: $e",
+        backgroundColor: AppColors.appRed,
+        colorText: AppColors.appWhite,
+      );
+    }
+  }
+
+  // Pick and send video
+  Future<void> pickAndSendVideo() async {
+    try {
+      print('🎥 [ChatMedia] Starting video picker');
+
+      final XFile? pickedFile = await _picker.pickVideo(
+        source: ImageSource.gallery,
+      );
+
+      if (pickedFile == null) {
+        print('⚠️ [ChatMedia] No video selected');
+        return;
+      }
+
+      print('✅ [ChatMedia] Video picked: ${pickedFile.path}');
+      final file = File(pickedFile.path);
+      await _sendMediaFile(file, 'video');
+    } catch (e) {
+      print('❌ [ChatMedia] Error picking video: $e');
+      Get.snackbar(
+        "Error",
+        "Failed to pick video: $e",
+        backgroundColor: AppColors.appRed,
+        colorText: AppColors.appWhite,
+      );
+    }
+  }
+
+  // Send media file
+  Future<void> _sendMediaFile(File file, String mediaType) async {
+    if (!isReady.value || userId == null || chat.id.isEmpty) {
+      print('❌ [ChatMedia] Chat not ready');
+      Get.snackbar(
+        "Error",
+        "Chat is not ready. Please wait.",
+        backgroundColor: AppColors.appRed,
+        colorText: AppColors.appWhite,
+      );
+      return;
+    }
+
+    try {
+      print('📤 [ChatMedia] Starting to send $mediaType');
+      print('📤 [ChatMedia] File: ${file.path}');
+      print('📤 [ChatMedia] ChatId: ${chat.id}');
+      print('📤 [ChatMedia] SenderId: $userId');
+
+      isSendingMedia(true);
+
+      // Show loading message
+      Get.snackbar(
+        "Sending",
+        "Uploading $mediaType...",
+        backgroundColor: AppColors.appGreen.withOpacity(0.8),
+        colorText: AppColors.appWhite,
+        duration: const Duration(seconds: 2),
+      );
+
+      final sentMessage = await ApiService.sendMediaMessage(
+        chatId: chat.id,
+        senderId: userId!,
+        mediaFile: file,
+      );
+
+      print('✅ [ChatMedia] Message sent successfully!');
+      print('✅ [ChatMedia] Message ID: ${sentMessage.id}');
+      print('✅ [ChatMedia] Content: ${sentMessage.content}');
+
+      messages.add(sentMessage);
+
+      // Update chat list
+      final chatController = Get.find<ChatController>();
+      chatController.updateLastMessage(
+        chat.id,
+        sentMessage.content ?? '[$mediaType]',
+        sentMessage.createdAt.toIso8601String(),
+      );
+
+      Get.snackbar(
+        "Success",
+        "${mediaType.capitalize} sent successfully!",
+        backgroundColor: AppColors.appGreen,
+        colorText: AppColors.appWhite,
+        duration: const Duration(seconds: 2),
+      );
+    } catch (e) {
+      print('❌ [ChatMedia] Failed to send $mediaType: $e');
+      
+      // Better error message for server issues
+      String errorMsg;
+      if (e.toString().contains('ENOENT') || e.toString().contains('no such file')) {
+        errorMsg = "Server upload folder not configured. Please contact support.";
+      } else if (e.toString().contains('500')) {
+        errorMsg = "Server error. Please try again later.";
+      } else {
+        errorMsg = "Failed to send $mediaType. Check your connection.";
+      }
+      
+      Get.snackbar(
+        "Upload Failed",
+        errorMsg,
+        backgroundColor: AppColors.appRed,
+        colorText: AppColors.appWhite,
+        duration: const Duration(seconds: 4),
+      );
+    } finally {
+      isSendingMedia(false);
     }
   }
 

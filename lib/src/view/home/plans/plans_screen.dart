@@ -22,7 +22,7 @@ class _PlansScreenState extends State<PlansScreen> {
         '✓ List 1 Vehicle',
         '✓ Basic Support',
         '✓ Standard Visibility',
-      ]
+      ],
     },
     {
       'name': 'Premium Plan',
@@ -34,7 +34,7 @@ class _PlansScreenState extends State<PlansScreen> {
         '✓ Priority Support',
         '✓ High Visibility',
         '✓ Featured Listing',
-      ]
+      ],
     },
     {
       'name': 'Elite Plan',
@@ -48,7 +48,7 @@ class _PlansScreenState extends State<PlansScreen> {
         '✓ Featured Listings',
         '✓ Analytics Dashboard',
         '✓ Lead Priority',
-      ]
+      ],
     },
   ];
 
@@ -92,10 +92,7 @@ class _PlansScreenState extends State<PlansScreen> {
         elevation: 0,
         title: const Text(
           'Plans & Offers',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),

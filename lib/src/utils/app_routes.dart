@@ -301,8 +301,5 @@ final Getpages = [
       return DealerDetailScreen(dealerId: dealerId);
     },
   ),
-  GetPage(
-    name: AppRoutes.plans,
-    page: () => const PlansScreen(),
-  ),
+  GetPage(name: AppRoutes.plans, page: () => const PlansScreen()),
 ];

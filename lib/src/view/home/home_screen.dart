@@ -384,14 +384,17 @@ class _HomeScreenState extends State<HomeScreen> {
         Get.toNamed(route);
       },
     });
-    
+
     // Add Plans & Offers
     baseItems.insert(3, {
       'name': 'Plans & Offers',
       'icon': Icons.card_giftcard,
-      'onTap': () => Get.toNamed(AppRoutes.plans),
+      'onTap': () {
+        print('✅ [HomeScreen] Plans & Offers tapped - Navigating to Plans screen');
+        Get.toNamed(AppRoutes.plans);
+      },
     });
-    
+
     // Add Ads entry
     // baseItems.insert(4, {
     //   'name': 'My Ads',
@@ -603,7 +606,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               value: 'payment',
                               child: Row(
                                 children: [
-                                  Icon(Icons.payment, color: AppColors.appGreen),
+                                  Icon(
+                                    Icons.payment,
+                                    color: AppColors.appGreen,
+                                  ),
                                   SizedBox(width: 10),
                                   Text('Payment'),
                                 ],

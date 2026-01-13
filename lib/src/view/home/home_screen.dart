@@ -592,43 +592,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             }
                           },
                         ),
-                        // Payment 3-dot Menu
-                        PopupMenuButton<String>(
-                          icon: const Icon(
-                            Icons.more_vert,
-                            color: AppColors.appGreen,
-                          ),
-                          onSelected: (String value) {
-                            print('🎯 [HomeScreen] PopupMenu selected: $value');
-                            if (value == 'payment') {
-                              print(
-                                '✅ [HomeScreen] Navigating to Plans screen',
-                              );
-                              Get.toNamed(AppRoutes.plans);
-                            }
-                          },
-                          itemBuilder: (BuildContext context) => [
-                            const PopupMenuItem<String>(
-                              value: 'payment',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.payment,
-                                    color: AppColors.appGreen,
-                                  ),
-                                  SizedBox(width: 10),
-                                  Text(
-                                    'Payment',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
                         // Fuel icon removed per UX request
                       ],
                     ),

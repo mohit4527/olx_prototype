@@ -163,7 +163,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
             if (selectedCurrency.isNotEmpty) ...[
               SizedBox(height: AppSizer().height1),
               Container(
-                padding: EdgeInsets.all(AppSizer().height1_5),
+                padding: EdgeInsets.all(AppSizer().height2),
                 decoration: BoxDecoration(
                   color: AppColors.appGreen.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),

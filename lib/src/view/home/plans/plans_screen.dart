@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
 import 'package:olx_prototype/src/controller/token_controller.dart';
-import 'package:olx_prototype/src/controller/dealer_profile_controller.dart';
+import 'package:olx_prototype/src/controller/dealer_controller.dart';
 
 class PlansScreen extends StatefulWidget {
   const PlansScreen({Key? key}) : super(key: key);

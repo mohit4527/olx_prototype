@@ -160,7 +160,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
             ),
             
             // Currency Display
-            if (selectedCurrency.isNotEmpty) ..[
+            if (selectedCurrency.isNotEmpty) ...[
               SizedBox(height: AppSizer().height1),
               Container(
                 padding: EdgeInsets.all(AppSizer().height1_5),

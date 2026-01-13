@@ -601,7 +601,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           onSelected: (String value) {
                             print('🎯 [HomeScreen] PopupMenu selected: $value');
                             if (value == 'payment') {
-                              print('✅ [HomeScreen] Navigating to Plans screen');
+                              print(
+                                '✅ [HomeScreen] Navigating to Plans screen',
+                              );
                               Get.toNamed(AppRoutes.plans);
                             }
                           },

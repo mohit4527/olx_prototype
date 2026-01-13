@@ -245,7 +245,7 @@ class PlanCard extends StatelessWidget {
                       Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: AppSizer().width2,
-                          vertical: AppSizer().height0_5,
+                          vertical: AppSizer().height1,
                         ),
                         decoration: BoxDecoration(
                           color: color,
@@ -306,7 +306,7 @@ class PlanCard extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: color,
                       padding: EdgeInsets.symmetric(
-                        vertical: AppSizer().height1_5,
+                        vertical: AppSizer().height2,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -383,7 +383,7 @@ class OfferCard extends StatelessWidget {
             Container(
               padding: EdgeInsets.symmetric(
                 horizontal: AppSizer().width2,
-                vertical: AppSizer().height0_5,
+                vertical: AppSizer().height1,
               ),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -410,13 +410,13 @@ class OfferCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            SizedBox(height: AppSizer().height0_5),
+            SizedBox(height: AppSizer().height1),
             // Description
             Text(
               description,
               style: TextStyle(
                 color: Colors.white70,
-                fontSize: AppSizer().fontSize11,
+                fontSize: AppSizer().fontSize10,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -437,7 +437,7 @@ class OfferCard extends StatelessWidget {
               child: Container(
                 padding: EdgeInsets.symmetric(
                   horizontal: AppSizer().width2,
-                  vertical: AppSizer().height0_5,
+                  vertical: AppSizer().height1,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
@@ -447,7 +447,7 @@ class OfferCard extends StatelessWidget {
                   code,
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: AppSizer().fontSize11,
+                    fontSize: AppSizer().fontSize10,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1,
                   ),

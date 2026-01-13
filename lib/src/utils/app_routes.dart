@@ -46,6 +46,7 @@ import '../model/all_product_model/all_product_model.dart';
 import '../view/test/subscription_test_screen_simple.dart';
 import '../view/home/location_settings/location_settings_screen.dart';
 import '../view/home/location_settings/filtered_products_screen.dart';
+import '../view/home/plans/plans_screen.dart';
 
 class AppRoutes {
   static String splash = "/splash_screen";
@@ -93,6 +94,7 @@ class AppRoutes {
   static String dealer_detail_screen = "/dealer_detail_screen";
   static String location_settings = "/location_settings_screen";
   static String filtered_products = "/filtered_products";
+  static String plans = "/plans_screen";
 }
 
 final Getpages = [
@@ -298,5 +300,9 @@ final Getpages = [
       }
       return DealerDetailScreen(dealerId: dealerId);
     },
+  ),
+  GetPage(
+    name: AppRoutes.plans,
+    page: () => const PlansScreen(),
   ),
 ];

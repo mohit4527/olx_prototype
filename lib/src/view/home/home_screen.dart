@@ -384,8 +384,16 @@ class _HomeScreenState extends State<HomeScreen> {
         Get.toNamed(route);
       },
     });
+    
+    // Add Plans & Offers
+    baseItems.insert(3, {
+      'name': 'Plans & Offers',
+      'icon': Icons.card_giftcard,
+      'onTap': () => Get.toNamed(AppRoutes.plans),
+    });
+    
     // Add Ads entry
-    // baseItems.insert(3, {
+    // baseItems.insert(4, {
     //   'name': 'My Ads',
     //   'icon': Icons.sell,
     //   'onTap': () => Get.toNamed(AppRoutes.ads),
@@ -578,6 +586,30 @@ class _HomeScreenState extends State<HomeScreen> {
                               Get.to(NotificationScreen());
                             }
                           },
+                        ),
+                        // Payment 3-dot Menu
+                        PopupMenuButton<String>(
+                          icon: const Icon(
+                            Icons.more_vert,
+                            color: AppColors.appGreen,
+                          ),
+                          onSelected: (String value) {
+                            if (value == 'payment') {
+                              Get.toNamed(AppRoutes.plans);
+                            }
+                          },
+                          itemBuilder: (BuildContext context) => [
+                            const PopupMenuItem<String>(
+                              value: 'payment',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.payment, color: AppColors.appGreen),
+                                  SizedBox(width: 10),
+                                  Text('Payment'),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                         // Fuel icon removed per UX request
                       ],

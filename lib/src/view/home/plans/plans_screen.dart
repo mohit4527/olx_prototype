@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:olx_prototype/src/constants/app_colors.dart';
 import 'package:olx_prototype/src/constants/app_sizer.dart';
+import 'package:olx_prototype/src/controller/token_controller.dart';
+import 'package:olx_prototype/src/controller/dealer_profile_controller.dart';
 
 class PlansScreen extends StatefulWidget {
   const PlansScreen({Key? key}) : super(key: key);
@@ -11,8 +13,33 @@ class PlansScreen extends StatefulWidget {
 }
 
 class _PlansScreenState extends State<PlansScreen> {
-  // Static Plans Data
-  final List<Map<String, dynamic>> plans = [
+  // Get controllers
+  late TokenController tokenController;
+  late DealerProfileController dealerController;
+  bool isDealer = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeControllers();
+  }
+
+  void _initializeControllers() {
+    try {
+      tokenController = Get.find<TokenController>();
+      dealerController = Get.find<DealerProfileController>();
+      
+      // Check if user is a dealer
+      isDealer = dealerController.isProfileCreated.value;
+      
+      print('🔍 [PlansScreen] User Type - isDealer: $isDealer');
+    } catch (e) {
+      print('⚠️ [PlansScreen] Error initializing controllers: $e');
+    }
+  }
+
+  // ===== USERS PLANS =====
+  final List<Map<String, dynamic>> userPlans = [
     {
       'name': 'Basic Plan',
       'price': '₹299',
@@ -22,6 +49,7 @@ class _PlansScreenState extends State<PlansScreen> {
         '✓ List 1 Vehicle',
         '✓ Basic Support',
         '✓ Standard Visibility',
+        '✓ Chat with Dealers',
       ],
     },
     {
@@ -34,6 +62,7 @@ class _PlansScreenState extends State<PlansScreen> {
         '✓ Priority Support',
         '✓ High Visibility',
         '✓ Featured Listing',
+        '✓ Badge on Profile',
       ],
     },
     {
@@ -46,8 +75,53 @@ class _PlansScreenState extends State<PlansScreen> {
         '✓ 24/7 Support',
         '✓ Premium Visibility',
         '✓ Featured Listings',
-        '✓ Analytics Dashboard',
-        '✓ Lead Priority',
+        '✓ Special Badge',
+        '✓ Priority Response',
+      ],
+    },
+  ];
+
+  // ===== DEALER PLANS =====
+  final List<Map<String, dynamic>> dealerPlans = [
+    {
+      'name': 'Starter Plan',
+      'price': '₹999',
+      'duration': '7 Days',
+      'color': Colors.blue,
+      'features': [
+        '✓ List 10 Vehicles',
+        '✓ Business Dashboard',
+        '✓ Dealer Badge',
+        '✓ Priority Support',
+      ],
+    },
+    {
+      'name': 'Professional Plan',
+      'price': '₹2,499',
+      'duration': '30 Days',
+      'color': Colors.orange,
+      'features': [
+        '✓ List 50 Vehicles',
+        '✓ Advanced Analytics',
+        '✓ Lead Management',
+        '✓ Featured Listings',
+        '✓ Premium Support',
+        '✓ Verified Dealer Badge',
+      ],
+    },
+    {
+      'name': 'Enterprise Plan',
+      'price': '₹5,999',
+      'duration': '90 Days',
+      'color': Colors.purple,
+      'features': [
+        '✓ Unlimited Listings',
+        '✓ Full Analytics Suite',
+        '✓ Advanced Lead Tools',
+        '✓ Premium Visibility',
+        '✓ 24/7 Dedicated Support',
+        '✓ Custom Branding',
+        '✓ API Access',
       ],
     },
   ];
@@ -86,13 +160,30 @@ class _PlansScreenState extends State<PlansScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the appropriate plans based on user type
+    final plans = isDealer ? dealerPlans : userPlans;
+    final planType = isDealer ? 'Dealer' : 'User';
+    
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.appGreen,
         elevation: 0,
-        title: const Text(
-          'Plans & Offers',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Plans & Offers',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              isDealer ? '🏢 Dealer Plans' : '👤 User Plans',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -102,6 +193,50 @@ class _PlansScreenState extends State<PlansScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
+            // ====== USER TYPE INDICATOR BANNER ======
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSizer().width4,
+                vertical: AppSizer().height2,
+              ),
+              color: isDealer ? Colors.orange.withOpacity(0.1) : Colors.blue.withOpacity(0.1),
+              child: Row(
+                children: [
+                  Icon(
+                    isDealer ? Icons.store : Icons.person,
+                    color: isDealer ? Colors.orange : Colors.blue,
+                    size: 24,
+                  ),
+                  SizedBox(width: AppSizer().width3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isDealer ? 'Dealer Account' : 'Regular User Account',
+                          style: TextStyle(
+                            fontSize: AppSizer().fontSize14,
+                            fontWeight: FontWeight.bold,
+                            color: isDealer ? Colors.orange : Colors.blue,
+                          ),
+                        ),
+                        Text(
+                          isDealer 
+                            ? 'Plans designed for vehicle dealers' 
+                            : 'Plans designed for individual sellers',
+                          style: TextStyle(
+                            fontSize: AppSizer().fontSize12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
             // ====== PLANS SECTION ======
             Padding(
               padding: EdgeInsets.all(AppSizer().width4),

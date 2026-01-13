@@ -28,10 +28,10 @@ class _PlansScreenState extends State<PlansScreen> {
     try {
       tokenController = Get.find<TokenController>();
       dealerController = Get.find<DealerProfileController>();
-      
+
       // Check if user is a dealer
       isDealer = dealerController.isProfileCreated.value;
-      
+
       print('🔍 [PlansScreen] User Type - isDealer: $isDealer');
     } catch (e) {
       print('⚠️ [PlansScreen] Error initializing controllers: $e');
@@ -163,7 +163,7 @@ class _PlansScreenState extends State<PlansScreen> {
     // Get the appropriate plans based on user type
     final plans = isDealer ? dealerPlans : userPlans;
     final planType = isDealer ? 'Dealer' : 'User';
-    
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.appGreen,
@@ -173,7 +173,10 @@ class _PlansScreenState extends State<PlansScreen> {
           children: [
             const Text(
               'Plans & Offers',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
               isDealer ? '🏢 Dealer Plans' : '👤 User Plans',
@@ -200,7 +203,9 @@ class _PlansScreenState extends State<PlansScreen> {
                 horizontal: AppSizer().width4,
                 vertical: AppSizer().height2,
               ),
-              color: isDealer ? Colors.orange.withOpacity(0.1) : Colors.blue.withOpacity(0.1),
+              color: isDealer
+                  ? Colors.orange.withOpacity(0.1)
+                  : Colors.blue.withOpacity(0.1),
               child: Row(
                 children: [
                   Icon(
@@ -222,9 +227,9 @@ class _PlansScreenState extends State<PlansScreen> {
                           ),
                         ),
                         Text(
-                          isDealer 
-                            ? 'Plans designed for vehicle dealers' 
-                            : 'Plans designed for individual sellers',
+                          isDealer
+                              ? 'Plans designed for vehicle dealers'
+                              : 'Plans designed for individual sellers',
                           style: TextStyle(
                             fontSize: AppSizer().fontSize12,
                             color: Colors.grey.shade600,
@@ -236,7 +241,7 @@ class _PlansScreenState extends State<PlansScreen> {
                 ],
               ),
             ),
-            
+
             // ====== PLANS SECTION ======
             Padding(
               padding: EdgeInsets.all(AppSizer().width4),

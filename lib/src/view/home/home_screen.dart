@@ -390,7 +390,9 @@ class _HomeScreenState extends State<HomeScreen> {
       'name': 'Plans & Offers',
       'icon': Icons.card_giftcard,
       'onTap': () {
-        print('✅ [HomeScreen] Plans & Offers tapped - Navigating to Plans screen');
+        print(
+          '✅ [HomeScreen] Plans & Offers tapped - Navigating to Plans screen',
+        );
         Get.toNamed(AppRoutes.plans);
       },
     });
@@ -597,7 +599,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: AppColors.appGreen,
                           ),
                           onSelected: (String value) {
+                            print('🎯 [HomeScreen] PopupMenu selected: $value');
                             if (value == 'payment') {
+                              print('✅ [HomeScreen] Navigating to Plans screen');
                               Get.toNamed(AppRoutes.plans);
                             }
                           },
@@ -611,7 +615,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                     color: AppColors.appGreen,
                                   ),
                                   SizedBox(width: 10),
-                                  Text('Payment'),
+                                  Text(
+                                    'Payment',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),

@@ -943,10 +943,22 @@ class DealerProfileController extends GetxController {
 
       final dealerProfiles = await ApiService.fetchDealerProfiles();
       if (dealerProfiles?.data != null && dealerProfiles!.data!.isNotEmpty) {
+        print('📊 [DealerController] Total dealer profiles from API: ${dealerProfiles.data!.length}');
+        
         // Find dealer profile with matching userId
         for (final profile in dealerProfiles.data!) {
-          if (profile.userId == userId && profile.id != null) {
-            print('🎯 [DealerController] Found matching dealer profile!');
+          // 🔥 DEBUG: Print all userIds to see what's coming from API
+          print('🔍 [DealerController] Checking profile - API userId: "${profile.userId}", Our userId: "$userId"');
+          print('   - Match: ${profile.userId == userId}');
+          print('   - Profile ID: ${profile.id}');
+          print('   - Business Name: ${profile.businessName}');
+          
+          // 🔥 FIX: Try both exact match and trimmed comparison
+          final apiUserId = profile.userId?.trim() ?? '';
+          final localUserId = userId.trim();
+          
+          if ((apiUserId == localUserId || profile.userId == userId) && profile.id != null) {
+            print('🎯 [DealerController] ✅ MATCH FOUND! Dealer profile exists!');
             print('   - UserId: ${profile.userId}');
             print('   - DealerId: ${profile.id}');
             print('   - Business Name: ${profile.businessName}');
@@ -957,6 +969,9 @@ class DealerProfileController extends GetxController {
 
             await prefs.setString(userDealerKey, profile.id!);
             await prefs.setBool(userProfileKey, true);
+            
+            // 🔥 Also save business name for display
+            await prefs.setString('businessName_$userId', profile.businessName ?? '');
 
             // Also update the reactive variable
             isProfileCreated.value = true;
@@ -964,13 +979,16 @@ class DealerProfileController extends GetxController {
             print('✅ [DealerController] Dealer profile synced successfully!');
             print('   - Saved dealerId: ${profile.id}');
             print('   - Set isProfileCreated: true');
+            print('   - BusinessName: ${profile.businessName}');
             return;
           }
         }
 
         print(
-          '❌ [DealerController] No dealer profile found for userId: $userId',
+          '❌ [DealerController] ⚠️ NO dealer profile found for userId: $userId',
         );
+        print('   - Checked ${dealerProfiles.data!.length} profiles');
+        print('   - None matched the current userId');
       } else {
         print(
           '⚠️ [DealerController] No dealer profiles data received from API',

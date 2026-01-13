@@ -16,10 +16,10 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
   final TextEditingController countryController = TextEditingController();
   final TextEditingController stateController = TextEditingController();
   final TextEditingController cityController = TextEditingController();
-  
+
   String selectedCurrency = '';
   String currencySymbol = '';
-  
+
   // Country to Currency mapping
   final Map<String, Map<String, String>> countryCurrencyMap = {
     'india': {'name': 'Indian Rupee', 'symbol': '₹', 'code': 'INR'},
@@ -38,7 +38,11 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
     'russia': {'name': 'Russian Ruble', 'symbol': '₽', 'code': 'RUB'},
     'brazil': {'name': 'Brazilian Real', 'symbol': 'R\$', 'code': 'BRL'},
     'mexico': {'name': 'Mexican Peso', 'symbol': 'Mex\$', 'code': 'MXN'},
-    'south africa': {'name': 'South African Rand', 'symbol': 'R', 'code': 'ZAR'},
+    'south africa': {
+      'name': 'South African Rand',
+      'symbol': 'R',
+      'code': 'ZAR',
+    },
     'saudi arabia': {'name': 'Saudi Riyal', 'symbol': '﷼', 'code': 'SAR'},
     'uae': {'name': 'UAE Dirham', 'symbol': 'د.إ', 'code': 'AED'},
     'dubai': {'name': 'UAE Dirham', 'symbol': 'د.إ', 'code': 'AED'},
@@ -51,7 +55,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
     'sri lanka': {'name': 'Sri Lankan Rupee', 'symbol': 'Rs', 'code': 'LKR'},
     'nepal': {'name': 'Nepalese Rupee', 'symbol': 'रू', 'code': 'NPR'},
   };
-  
+
   void updateCurrency(String country) {
     if (country.isEmpty) {
       setState(() {
@@ -60,16 +64,18 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
       });
       return;
     }
-    
+
     final countryLower = country.toLowerCase().trim();
     final currencyData = countryCurrencyMap[countryLower];
-    
+
     if (currencyData != null) {
       setState(() {
         selectedCurrency = '${currencyData['name']} (${currencyData['code']})';
         currencySymbol = currencyData['symbol']!;
       });
-      print('✅ Currency updated: $selectedCurrency with symbol: $currencySymbol');
+      print(
+        '✅ Currency updated: $selectedCurrency with symbol: $currencySymbol',
+      );
     } else {
       setState(() {
         selectedCurrency = 'Currency not found for "$country"';
@@ -158,7 +164,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                 updateCurrency(value.trim());
               },
             ),
-            
+
             // Currency Display
             if (selectedCurrency.isNotEmpty) ...[
               SizedBox(height: AppSizer().height1),

@@ -4,13 +4,80 @@ import '../../../constants/app_colors.dart';
 import '../../../constants/app_sizer.dart';
 import '../../../controller/location_controller.dart';
 
-class LocationSettingsScreen extends StatelessWidget {
-  LocationSettingsScreen({super.key});
+class LocationSettingsScreen extends StatefulWidget {
+  const LocationSettingsScreen({super.key});
 
+  @override
+  State<LocationSettingsScreen> createState() => _LocationSettingsScreenState();
+}
+
+class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
   final LocationController controller = Get.put(LocationController());
   final TextEditingController countryController = TextEditingController();
   final TextEditingController stateController = TextEditingController();
   final TextEditingController cityController = TextEditingController();
+  
+  String selectedCurrency = '';
+  String currencySymbol = '';
+  
+  // Country to Currency mapping
+  final Map<String, Map<String, String>> countryCurrencyMap = {
+    'india': {'name': 'Indian Rupee', 'symbol': '₹', 'code': 'INR'},
+    'united states': {'name': 'US Dollar', 'symbol': '\$', 'code': 'USD'},
+    'usa': {'name': 'US Dollar', 'symbol': '\$', 'code': 'USD'},
+    'united kingdom': {'name': 'British Pound', 'symbol': '£', 'code': 'GBP'},
+    'uk': {'name': 'British Pound', 'symbol': '£', 'code': 'GBP'},
+    'canada': {'name': 'Canadian Dollar', 'symbol': 'C\$', 'code': 'CAD'},
+    'australia': {'name': 'Australian Dollar', 'symbol': 'A\$', 'code': 'AUD'},
+    'japan': {'name': 'Japanese Yen', 'symbol': '¥', 'code': 'JPY'},
+    'china': {'name': 'Chinese Yuan', 'symbol': '¥', 'code': 'CNY'},
+    'germany': {'name': 'Euro', 'symbol': '€', 'code': 'EUR'},
+    'france': {'name': 'Euro', 'symbol': '€', 'code': 'EUR'},
+    'italy': {'name': 'Euro', 'symbol': '€', 'code': 'EUR'},
+    'spain': {'name': 'Euro', 'symbol': '€', 'code': 'EUR'},
+    'russia': {'name': 'Russian Ruble', 'symbol': '₽', 'code': 'RUB'},
+    'brazil': {'name': 'Brazilian Real', 'symbol': 'R\$', 'code': 'BRL'},
+    'mexico': {'name': 'Mexican Peso', 'symbol': 'Mex\$', 'code': 'MXN'},
+    'south africa': {'name': 'South African Rand', 'symbol': 'R', 'code': 'ZAR'},
+    'saudi arabia': {'name': 'Saudi Riyal', 'symbol': '﷼', 'code': 'SAR'},
+    'uae': {'name': 'UAE Dirham', 'symbol': 'د.إ', 'code': 'AED'},
+    'dubai': {'name': 'UAE Dirham', 'symbol': 'د.إ', 'code': 'AED'},
+    'singapore': {'name': 'Singapore Dollar', 'symbol': 'S\$', 'code': 'SGD'},
+    'malaysia': {'name': 'Malaysian Ringgit', 'symbol': 'RM', 'code': 'MYR'},
+    'thailand': {'name': 'Thai Baht', 'symbol': '฿', 'code': 'THB'},
+    'indonesia': {'name': 'Indonesian Rupiah', 'symbol': 'Rp', 'code': 'IDR'},
+    'pakistan': {'name': 'Pakistani Rupee', 'symbol': '₨', 'code': 'PKR'},
+    'bangladesh': {'name': 'Bangladeshi Taka', 'symbol': '৳', 'code': 'BDT'},
+    'sri lanka': {'name': 'Sri Lankan Rupee', 'symbol': 'Rs', 'code': 'LKR'},
+    'nepal': {'name': 'Nepalese Rupee', 'symbol': 'रू', 'code': 'NPR'},
+  };
+  
+  void updateCurrency(String country) {
+    if (country.isEmpty) {
+      setState(() {
+        selectedCurrency = '';
+        currencySymbol = '';
+      });
+      return;
+    }
+    
+    final countryLower = country.toLowerCase().trim();
+    final currencyData = countryCurrencyMap[countryLower];
+    
+    if (currencyData != null) {
+      setState(() {
+        selectedCurrency = '${currencyData['name']} (${currencyData['code']})';
+        currencySymbol = currencyData['symbol']!;
+      });
+      print('✅ Currency updated: $selectedCurrency with symbol: $currencySymbol');
+    } else {
+      setState(() {
+        selectedCurrency = 'Currency not found for "$country"';
+        currencySymbol = '';
+      });
+      print('⚠️ Currency not found for: $country');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,8 +155,78 @@ class LocationSettingsScreen extends StatelessWidget {
               icon: Icons.public,
               onChanged: (value) {
                 controller.updateCountry(value.trim());
+                updateCurrency(value.trim());
               },
             ),
+            
+            // Currency Display
+            if (selectedCurrency.isNotEmpty) ..[
+              SizedBox(height: AppSizer().height1),
+              Container(
+                padding: EdgeInsets.all(AppSizer().height1_5),
+                decoration: BoxDecoration(
+                  color: AppColors.appGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.appGreen.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.monetization_on,
+                      color: AppColors.appGreen,
+                      size: 20,
+                    ),
+                    SizedBox(width: AppSizer().width2),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Currency',
+                            style: TextStyle(
+                              fontSize: AppSizer().fontSize12,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            selectedCurrency,
+                            style: TextStyle(
+                              fontSize: AppSizer().fontSize14,
+                              color: AppColors.appGreen,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (currencySymbol.isNotEmpty)
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppSizer().width3,
+                          vertical: AppSizer().height1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.appGreen,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          currencySymbol,
+                          style: TextStyle(
+                            fontSize: AppSizer().fontSize18,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
 
             SizedBox(height: AppSizer().height2),
 

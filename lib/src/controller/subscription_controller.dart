@@ -247,7 +247,7 @@ class SubscriptionController extends GetxController {
           orderId: orderId.value ?? '',
           amount: price.value.toInt(),
           keyId: _razorpayKeyId,
-          name: 'OLX Prototype Premium',
+          name: 'Old Market Premium',
           description: 'Premium Subscription (${validityDays.value} days)',
           prefillContact: tokenController.phoneNumber.value,
           prefillEmail: tokenController.email.value,
